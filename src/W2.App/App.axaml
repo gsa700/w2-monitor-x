@@ -1,0 +1,30 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="W2.App.App"
+             RequestedThemeVariant="Dark">
+
+  <Application.Resources>
+    <!-- W2 Monitor palette (matches the PowerShell app so the two look like a family).
+         Kept in sync with Palette.cs. -->
+    <SolidColorBrush x:Key="BgBrush"    Color="#1C1C1E"/>
+    <SolidColorBrush x:Key="PanelBrush" Color="#2C2C30"/>
+    <SolidColorBrush x:Key="TrackBrush" Color="#3C3C42"/>
+    <SolidColorBrush x:Key="TextBrush"  Color="#DCDCDC"/>
+    <SolidColorBrush x:Key="AmberBrush" Color="#FFB000"/>
+    <SolidColorBrush x:Key="GreenBrush" Color="#3CC850"/>
+    <SolidColorBrush x:Key="RedBrush"   Color="#EB4646"/>
+    <SolidColorBrush x:Key="DimBrush"   Color="#8C8C94"/>
+    <SolidColorBrush x:Key="CyanBrush"  Color="#00D2EB"/>
+    <!-- App name + FORWARD POWER hero -->
+    <SolidColorBrush x:Key="HeroBrush"  Color="#3CC850"/>
+    <!-- Forward power bar -->
+    <SolidColorBrush x:Key="BlueBrush"  Color="#4A90E2"/>
+    <!-- SWR bar (static; the SWR number stays threshold-colored) -->
+    <SolidColorBrush x:Key="GoldBrush"  Color="#FFB000"/>
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme />
+  </Application.Styles>
+
+</Application>
