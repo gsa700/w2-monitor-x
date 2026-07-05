@@ -1,0 +1,54 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:W2.App.ViewModels"
+        x:Class="W2.App.Views.SetupWindow"
+        x:DataType="vm:SetupViewModel"
+        Width="420" SizeToContent="Height" CanResize="False"
+        Background="{StaticResource BgBrush}"
+        Icon="/Assets/app.ico"
+        Title="W2 Monitor — Setup">
+
+  <StackPanel Margin="16,14" Spacing="12">
+
+    <TextBlock Text="METERS" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}"/>
+
+    <!-- Meter list -->
+    <Border Background="{StaticResource PanelBrush}" CornerRadius="4" Padding="4">
+      <ListBox ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+               Background="Transparent" MinHeight="90" MaxHeight="180">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:MeterRow">
+            <Grid ColumnDefinitions="Auto,*">
+              <Ellipse Grid.Column="0" Width="10" Height="10" Fill="{Binding DotBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+              <StackPanel Grid.Column="1">
+                <TextBlock Text="{Binding Text}" Foreground="{StaticResource TextBrush}"/>
+                <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource DimBrush}" FontSize="11"/>
+              </StackPanel>
+            </Grid>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Border>
+
+    <!-- Meter actions -->
+    <Grid ColumnDefinitions="*,*,*,*" >
+      <Button Grid.Column="0" Content="Add" Command="{Binding AddCommand}" HorizontalAlignment="Stretch" Margin="0,0,3,0"/>
+      <Button Grid.Column="1" Content="Remove" Command="{Binding RemoveCommand}" HorizontalAlignment="Stretch" Margin="3,0,3,0"/>
+      <Button Grid.Column="2" Content="Connect All" Command="{Binding ConnectAllCommand}" HorizontalAlignment="Stretch" Margin="3,0,3,0"/>
+      <Button Grid.Column="3" Content="Disc. All" Command="{Binding DisconnectAllCommand}" HorizontalAlignment="Stretch" Margin="3,0,0,0"/>
+    </Grid>
+
+    <!-- Selected meter: port assignment + connect -->
+    <TextBlock Text="SELECTED METER — PORT" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}"/>
+    <Grid ColumnDefinitions="*,Auto,Auto">
+      <ComboBox Grid.Column="0" ItemsSource="{Binding Ports}" SelectedItem="{Binding SelectedPort, Mode=TwoWay}"
+                HorizontalAlignment="Stretch" PlaceholderText="Assign COM port"/>
+      <Button Grid.Column="1" Content="{Binding ToggleConnectLabel}" Command="{Binding ToggleConnectCommand}" Width="96" Margin="6,0,0,0"/>
+      <Button Grid.Column="2" Content="Refresh" Command="{Binding RefreshCommand}" Margin="6,0,0,0"/>
+    </Grid>
+
+    <TextBlock Text="The main display auto-follows whichever meter is transmitting; pick one here to pin it."
+               Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
+
+  </StackPanel>
+</Window>

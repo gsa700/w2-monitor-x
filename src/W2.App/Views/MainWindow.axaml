@@ -8,10 +8,10 @@
         Icon="/Assets/app.ico"
         Title="W2 Monitor">
 
-  <Grid Margin="16,12" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+  <Grid Margin="16,12" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
 
     <!-- Header -->
-    <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*">
+    <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*,Auto">
       <TextBlock Grid.Column="0" Text="{Binding TitleText}" FontSize="20" FontWeight="Bold"
                  Foreground="{StaticResource HeroBrush}" VerticalAlignment="Center">
         <TextBlock.Effect>
@@ -21,24 +21,16 @@
       <Ellipse Grid.Column="1" Width="12" Height="12" Fill="{Binding ConnDotBrush}"
                VerticalAlignment="Center" Margin="10,0,0,0"/>
       <TextBlock Grid.Column="2" Text="{Binding StatusText}" Foreground="{StaticResource DimBrush}"
-                 VerticalAlignment="Center" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis"/>
+                 VerticalAlignment="Center" Margin="10,0,10,0" TextTrimming="CharacterEllipsis"/>
+      <Button Grid.Column="3" Content="Setup" Click="OnSetupClick"/>
     </Grid>
 
-    <!-- Connection row (inline for Phase 2; moves to Setup in Phase 3) -->
-    <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" Margin="0,10,0,0">
-      <ComboBox Grid.Column="0" ItemsSource="{Binding Ports}"
-                SelectedItem="{Binding SelectedPort, Mode=TwoWay}"
-                HorizontalAlignment="Stretch" PlaceholderText="Select COM port"/>
-      <Button Grid.Column="1" Content="{Binding ConnectLabel}" Command="{Binding ConnectCommand}" Margin="6,0,0,0" Width="96"/>
-      <Button Grid.Column="2" Content="Refresh" Command="{Binding RefreshCommand}" Margin="6,0,0,0"/>
-    </Grid>
-
-    <!-- Status line: sensor · type · range -->
-    <TextBlock Grid.Row="2" Text="{Binding StatusLineText}" Foreground="{StaticResource CyanBrush}"
+    <!-- Status line: sensor · type · range (focused meter) -->
+    <TextBlock Grid.Row="1" Text="{Binding StatusLineText}" Foreground="{StaticResource CyanBrush}"
                FontFamily="Consolas" FontSize="13" Margin="0,10,0,0"/>
 
     <!-- Hero readouts -->
-    <Grid Grid.Row="3" ColumnDefinitions="*,*" Margin="0,10,0,0">
+    <Grid Grid.Row="2" ColumnDefinitions="*,*" Margin="0,10,0,0">
       <StackPanel Grid.Column="0">
         <TextBlock Text="FORWARD POWER" FontSize="11" FontWeight="Bold" Foreground="{StaticResource DimBrush}"/>
         <TextBlock Text="{Binding PowerText}" FontFamily="Consolas" FontSize="34" FontWeight="Bold"
@@ -53,7 +45,7 @@
     </Grid>
 
     <!-- Bars: full-width forward power, thin SWR strip below -->
-    <StackPanel Grid.Row="4" Spacing="2" Margin="0,10,0,0">
+    <StackPanel Grid.Row="3" Spacing="2" Margin="0,10,0,0">
       <ProgressBar Minimum="0" Maximum="{Binding PowerBarMax}" Value="{Binding PowerBarValue}"
                    Height="14" ShowProgressText="False"
                    Foreground="{StaticResource BlueBrush}" Background="{StaticResource TrackBrush}"/>
@@ -63,7 +55,7 @@
     </StackPanel>
 
     <!-- Secondary rows -->
-    <StackPanel Grid.Row="5" Margin="0,12,0,0">
+    <StackPanel Grid.Row="4" Margin="0,12,0,0">
       <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,6">
         <TextBlock Grid.Column="0" Text="TX TIMER" Width="150" FontSize="11" FontWeight="Bold" Foreground="{StaticResource DimBrush}" VerticalAlignment="Center"/>
         <TextBlock Grid.Column="1" Text="{Binding TxTimerText}" FontFamily="Consolas" FontSize="16" FontWeight="Bold" Foreground="{Binding TxBrush}" HorizontalAlignment="Right"/>

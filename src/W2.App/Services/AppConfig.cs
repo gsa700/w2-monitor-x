@@ -2,18 +2,39 @@ using System.Text.Json;
 
 namespace W2.App.Services;
 
-/// <summary>
-/// Persisted state. Slim for the Phase 0 scaffold: window position plus a single
-/// port/serial. PHASE 3 TODO: replace Port/Serial with a Meters[] list (one entry per
-/// W2, each with its own COM + chip serial) once the multi-meter manager lands.
-/// </summary>
+/// <summary>Persisted state: window bounds, the meter list, and misc flags.</summary>
 public sealed class AppConfig
 {
     public double? X { get; set; }
     public double? Y { get; set; }
-    public string? Port { get; set; }
-    public string? Serial { get; set; }   // FTDI/USB chip serial, so the cable is followed across COM renumbering
+    public double? SetupX { get; set; }
+    public double? SetupY { get; set; }
+
+    public List<MeterConfig> Meters { get; set; } = new();
     public bool CheckUpdatesAtStartup { get; set; }
+
+    // --- legacy single-meter fields (Phase 2 config); migrated on load ---
+    public string? Port { get; set; }
+    public string? Serial { get; set; }
+
+    /// <summary>Fold a pre-multi-meter config (single Port/Serial) into the Meters list.</summary>
+    public void MigrateLegacy()
+    {
+        if (Meters.Count == 0 && Port is not null)
+        {
+            Meters.Add(new MeterConfig { Id = Guid.NewGuid().ToString("N")[..7], Name = "W2 #1", Port = Port, Serial = Serial });
+        }
+        Port = null;
+        Serial = null;
+    }
+}
+
+public sealed class MeterConfig
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..7];
+    public string Name { get; set; } = "W2";
+    public string? Port { get; set; }
+    public string? Serial { get; set; }
 }
 
 public static class ConfigStore
@@ -37,7 +58,11 @@ public static class ConfigStore
         try
         {
             if (File.Exists(Path))
-                return JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(Path)) ?? new AppConfig();
+            {
+                var cfg = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(Path)) ?? new AppConfig();
+                cfg.MigrateLegacy();
+                return cfg;
+            }
         }
         catch { /* fall through to defaults */ }
         return new AppConfig();

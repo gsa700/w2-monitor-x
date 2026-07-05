@@ -1,5 +1,7 @@
 using System.Reflection;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 
 namespace W2.App.Views;
@@ -18,4 +20,7 @@ public partial class MainWindow : Window
     }
 
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
+
+    private void OnSetupClick(object? sender, RoutedEventArgs e) =>
+        (Application.Current as App)?.ShowSetup();
 }

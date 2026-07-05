@@ -13,8 +13,12 @@ public sealed class W2SimReader : IReadingSource
     private const int TickMs = 80;
 
     private readonly Random _rnd = new();
+    private readonly double _phaseOffset;
     private Thread? _thread;
     private volatile bool _running;
+
+    /// <param name="phaseOffsetSeconds">Shifts the idle/TX cycle so multiple sims alternate overs.</param>
+    public W2SimReader(double phaseOffsetSeconds = 0) => _phaseOffset = phaseOffsetSeconds;
 
     public event Action<W2Reading>? ReadingReceived;
     public event Action<string, bool>? StatusChanged;
@@ -45,7 +49,7 @@ public sealed class W2SimReader : IReadingSource
 
         while (_running)
         {
-            var t = (DateTime.UtcNow - start).TotalSeconds;
+            var t = (DateTime.UtcNow - start).TotalSeconds + _phaseOffset;
             var cycle = t % 12.0;
             var tx = cycle is >= 3.0 and < 9.0;
 
