@@ -3,6 +3,13 @@
 Cross-platform **W2 Monitor** (.NET 8 + Avalonia). Companion to the original PowerShell
 app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
+## [0.3.2-beta] - 2026-07-05
+
+### Added
+- **Setup meter list shows the cable's serial** after the COM port, e.g. `W2 #1 · COM4
+  (A10KMB4VA)` — like the earlier PowerShell version. On Linux the long `/dev/serial/by-id`
+  name is shortened to the embedded serial with a leading `…` (e.g. `…A10KMB4VA`).
+
 ## [0.3.1-beta] - 2026-07-05
 
 UI polish and out-of-the-box usability from first dogfooding.
