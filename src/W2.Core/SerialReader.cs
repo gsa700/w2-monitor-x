@@ -81,7 +81,7 @@ public sealed class SerialReader : IReadingSource
         }
         catch (Exception ex) when (_running)
         {
-            StatusChanged?.Invoke($"Error: {ex.Message}", true);
+            StatusChanged?.Invoke(SerialErrors.Describe(ex, portName, OperatingSystem.IsLinux()), true);
         }
         finally
         {

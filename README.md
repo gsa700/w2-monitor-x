@@ -34,6 +34,17 @@ dotnet publish src/W2.App -c Release -r linux-x64    --self-contained -p:Publish
 dotnet publish src/W2.App -c Release -r linux-arm64  --self-contained -p:PublishSingleFile=true -o publish/linux-arm64
 ```
 
+## Linux / Raspberry Pi
+
+- **Serial permissions:** opening `/dev/ttyUSB*`/`/dev/ttyACM*` requires membership in the
+  `dialout` group. If a connection fails with a permission error, run
+  `sudo usermod -aG dialout $USER` and log out/in. (The app surfaces this hint on the error.)
+- **Cable pinning:** on Linux the app pins each W2 by its stable `/dev/serial/by-id/*` name
+  and follows it to whatever `/dev/tty*` it currently maps to — the non-Windows analog of the
+  Windows FTDI chip-serial pinning, so a replug/renumber doesn't lose the meter.
+- **Raspberry Pi:** use the `linux-arm64` build. Renderer is Avalonia/Skia; validated to build
+  and run, with on-Pi performance/scale still to be checked on real hardware.
+
 ## License
 
 GPLv3 — see [LICENSE](LICENSE). Created by David Erickson (AB0R).
