@@ -1,3 +1,4 @@
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -11,6 +12,8 @@ namespace W2.App;
 public partial class App : Application
 {
     private AppConfig _config = new();
+    private MeterService _meter = null!;
+    private MainWindowViewModel _mainVm = null!;
     private MainWindow _mainWindow = null!;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
@@ -20,11 +23,16 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             _config = ConfigStore.Load();
+            _meter = new MeterService();
+            _mainVm = new MainWindowViewModel(_meter);
 
-            // PHASE 2/3 TODO: construct MeterService/MeterManager here, resolve the saved
-            // port by chip serial (PortIdentity.ResolvePort) and auto-connect, then feed
-            // a live MainWindowViewModel. Scaffold just shows a placeholder VM.
-            _mainWindow = new MainWindow { DataContext = new MainWindowViewModel() };
+            // Follow the cable by its chip serial across COM renumbering, then auto-connect.
+            var startupPort = PortIdentity.ResolvePort(_config.Port, _config.Serial);
+            _mainVm.SelectPort(startupPort);
+            if (startupPort is not null && MeterService.GetPortNames().Contains(startupPort))
+                _meter.Connect(startupPort);
+
+            _mainWindow = new MainWindow { DataContext = _mainVm };
             RestoreMainBounds(_mainWindow);
 
             desktop.MainWindow = _mainWindow;
@@ -55,8 +63,13 @@ public partial class App : Application
         {
             _config.X = _mainWindow.Position.X;
             _config.Y = _mainWindow.Position.Y;
+
+            var port = _meter.CurrentPort ?? _mainVm.SelectedPort;
+            _config.Port = port;
+            if (port is not null && PortIdentity.SerialFor(port) is { } serial) _config.Serial = serial;
             ConfigStore.Save(_config);
         }
         catch { /* best effort */ }
+        _meter.Dispose();
     }
 }
