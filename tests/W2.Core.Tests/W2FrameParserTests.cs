@@ -130,6 +130,43 @@ public class W2FrameParserTests
         Assert.False(r.IsTransmitting);
         Assert.Null(r.ReturnLossDb);
     }
+
+    // ---- Real device captures (W2 A10KMB4VA on COM4, ~15 W carrier into a dummy load, 2026-07-05) ----
+
+    [Fact]
+    public void RealCapture_tx_forward_15w() =>
+        Assert.Equal(15.53, W2FrameParser.Power("F01553D2;")!.Value, 2);
+
+    [Fact]
+    public void RealCapture_tx_reflected() =>
+        Assert.Equal(0.03, W2FrameParser.Power("R00003D2;")!.Value, 2);
+
+    [Fact]
+    public void RealCapture_tx_swr() =>
+        Assert.Equal(1.08, W2FrameParser.Swr("S0108;")!.Value, 2);
+
+    [Fact]
+    public void RealCapture_tx_info_locks_to_live_sampler()
+    {
+        // Under RF the active-sampler byte flips from 0 (hunting) to the live sampler — here S2
+        // (byte b[6]='2'), the HF 2 kW input. Idle "I22110101112" has b[6]='0'.
+        var i = W2FrameParser.Info("I22110121112;");
+        Assert.True(i.Valid);
+        Assert.Equal(Sampler.S2, i.ActiveSampler);
+        Assert.Equal("HF 2 kW", i.TypeName);
+        Assert.Equal("20 W", i.RangeName);
+        Assert.Equal(20.0, i.FullScaleW);
+    }
+
+    [Fact]
+    public void RealCapture_idle_info_is_hunting()
+    {
+        // Idle Search-mode frame: active = none, so the UI must hold last-good (anti-strobe).
+        var i = W2FrameParser.Info("I12120101112;");
+        Assert.True(i.Valid);
+        Assert.Equal(Sampler.Unknown, i.ActiveSampler);
+        Assert.Equal("VHF/UHF", i.TypeName);
+    }
 }
 
 public class W2ReadingTests
