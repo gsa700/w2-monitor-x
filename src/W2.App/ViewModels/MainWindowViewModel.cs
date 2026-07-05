@@ -34,9 +34,6 @@ public sealed class MainWindowViewModel : ViewModelBase
     public string TitleText => "W2 MONITOR";
     public DisplaySettings Display { get; }
 
-    private string _statusText = "No meters — open Setup";
-    public string StatusText { get => _statusText; private set => SetProperty(ref _statusText, value); }
-
     private IBrush _connDotBrush = Palette.DimBrush;
     public IBrush ConnDotBrush { get => _connDotBrush; private set => SetProperty(ref _connDotBrush, value); }
 
@@ -84,13 +81,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         var m = _manager.Focus;
         if (m is null || !m.IsConnected)
         {
-            StatusText = _manager.Meters.Count == 0 ? "No meters — open Setup" : "Disconnected";
             ConnDotBrush = Palette.DimBrush;
             Blank();
+            StatusLineText = _manager.Meters.Count == 0 ? "No meters — open Setup" : "Disconnected";
             return;
         }
 
-        StatusText = m.StatusIsError ? m.Status : $"{m.Name} · {m.Status}";
         ConnDotBrush = m.StatusIsError ? Palette.RedBrush
             : m.Current is not null ? Palette.GreenBrush : Palette.AmberBrush;
 
@@ -110,7 +106,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         ReflectedText = m.LastReflectedW is { } refl ? $"{refl:0.0} W" : "— W";
         ReturnLossText = m.Current?.ReturnLossDb is { } rl ? $"{rl:0.0} dB" : "— dB";
         PeakText = $"{m.SessionPeakW:0.0} W";
-        StatusLineText = m.Alarm ? "⚠ SWR ALARM" : $"{m.SensorLabel} · {m.TypeLabel} · {m.RangeLabel}";
+        // Line 2: sensor · type · range, prefixed with the meter name when >1 meter is connected
+        // (which W2 is "in use"), like the earlier version.
+        var prefix = _manager.Meters.Count(x => x.IsConnected) > 1 ? $"{m.Name} · " : "";
+        StatusLineText = m.Alarm ? "⚠ SWR ALARM" : $"{prefix}{m.SensorLabel} · {m.TypeLabel} · {m.RangeLabel}";
 
         UpdateTx();
     }
