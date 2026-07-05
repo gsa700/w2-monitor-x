@@ -26,7 +26,9 @@ public sealed class UpdateInfo
 /// </summary>
 public static class UpdateService
 {
-    // TODO: confirm the repo slug once the cross-platform port has its own GitHub repo.
+    // The cross-platform port's own repo (separate from the PowerShell gsa700/w2-monitor).
+    // Note: CheckAsync hits /releases/latest, which excludes pre-releases — the in-app update
+    // check only surfaces full (non-prerelease) releases.
     public const string Repo = "gsa700/w2-monitor-x";
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30) };
