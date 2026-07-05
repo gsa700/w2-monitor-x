@@ -30,10 +30,14 @@ public sealed class PowerSwrBar : Control
     public static readonly StyledProperty<bool> ShowSwrBarProperty =
         AvaloniaProperty.Register<PowerSwrBar, bool>(nameof(ShowSwrBar), true);
 
+    /// <summary>Forward-power bar fill; bound to the theme accent so it matches the Setup selection.</summary>
+    public static readonly StyledProperty<IBrush> FillProperty =
+        AvaloniaProperty.Register<PowerSwrBar, IBrush>(nameof(Fill), Palette.BlueBrush);
+
     static PowerSwrBar()
     {
         AffectsRender<PowerSwrBar>(ValueProperty, MaxProperty, HeldPeakProperty, SwrProperty,
-            ShowPowerBarProperty, ShowSwrBarProperty);
+            ShowPowerBarProperty, ShowSwrBarProperty, FillProperty);
         AffectsMeasure<PowerSwrBar>(ShowPowerBarProperty, ShowSwrBarProperty);
     }
 
@@ -43,6 +47,7 @@ public sealed class PowerSwrBar : Control
     public double Swr { get => GetValue(SwrProperty); set => SetValue(SwrProperty, value); }
     public bool ShowPowerBar { get => GetValue(ShowPowerBarProperty); set => SetValue(ShowPowerBarProperty, value); }
     public bool ShowSwrBar { get => GetValue(ShowSwrBarProperty); set => SetValue(ShowSwrBarProperty, value); }
+    public IBrush Fill { get => GetValue(FillProperty); set => SetValue(FillProperty, value); }
 
     protected override Size MeasureOverride(Size availableSize)
     {
@@ -66,7 +71,7 @@ public sealed class PowerSwrBar : Control
 
             var frac = Fraction(Value, Max);
             if (frac > 0)
-                ctx.FillRectangle(Palette.BlueBrush, new Rect(0, y, w * frac, PowerHeight), 2);
+                ctx.FillRectangle(Fill ?? Palette.BlueBrush, new Rect(0, y, w * frac, PowerHeight), 2);
 
             // Peak-hold marker: a thin cyan bar at the held-peak position.
             var pk = Fraction(HeldPeak, Max);

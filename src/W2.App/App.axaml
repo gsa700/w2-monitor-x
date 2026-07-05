@@ -21,6 +21,8 @@
     <SolidColorBrush x:Key="BlueBrush"  Color="#4A90E2"/>
     <!-- SWR bar (static; the SWR number stays threshold-colored) -->
     <SolidColorBrush x:Key="GoldBrush"  Color="#FFB000"/>
+    <!-- Theme accent — same blue the Setup meter-list selection uses (tracks the OS accent). -->
+    <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource SystemAccentColor}"/>
   </Application.Resources>
 
   <Application.Styles>

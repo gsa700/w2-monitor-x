@@ -21,7 +21,7 @@
     </Grid>
 
     <!-- Status line: sensor · type · range (focused meter) -->
-    <TextBlock Grid.Row="1" Text="{Binding StatusLineText}" Foreground="{StaticResource CyanBrush}"
+    <TextBlock Grid.Row="1" Text="{Binding StatusLineText}" Foreground="{DynamicResource AccentBrush}"
                FontFamily="Consolas" FontSize="13" Margin="0,10,0,0"
                IsVisible="{Binding Display.ShowStatusLine}"/>
 
@@ -44,6 +44,7 @@
     <ctl:PowerSwrBar Grid.Row="3" Margin="0,10,0,0" HorizontalAlignment="Stretch"
                      Value="{Binding PowerBarValue}" Max="{Binding PowerBarMax}"
                      HeldPeak="{Binding HeldPeakValue}" Swr="{Binding SwrBarValue}"
+                     Fill="{DynamicResource AccentBrush}"
                      ShowPowerBar="{Binding Display.ShowPowerBar}" ShowSwrBar="{Binding Display.ShowSwrBar}"/>
 
     <!-- Secondary rows -->
