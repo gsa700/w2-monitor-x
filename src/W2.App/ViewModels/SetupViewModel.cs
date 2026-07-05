@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Media;
 using W2.App.Services;
 using W2.App.Settings;
+using W2.Core;
 
 namespace W2.App.ViewModels;
 
@@ -30,6 +31,7 @@ public sealed class SetupViewModel : ViewModelBase
         ConnectAllCommand = new RelayCommand(() => _manager.ConnectAll());
         DisconnectAllCommand = new RelayCommand(() => _manager.DisconnectAll());
         RefreshCommand = new RelayCommand(RefreshPorts);
+        DetectCommand = new RelayCommand(() => _ = DetectAsync(), () => !_manager.IsSimulated);
 
         CheckUpdatesCommand = new RelayCommand(() => _ = CheckUpdatesAsync(), () => !_updateBusy);
         UpdateNowCommand = new RelayCommand(() => _ = UpdateNowAsync(), () => _updateInfo?.AssetUrl is not null && !_updateBusy);
@@ -50,9 +52,13 @@ public sealed class SetupViewModel : ViewModelBase
     public RelayCommand ConnectAllCommand { get; }
     public RelayCommand DisconnectAllCommand { get; }
     public RelayCommand RefreshCommand { get; }
+    public RelayCommand DetectCommand { get; }
     public RelayCommand CheckUpdatesCommand { get; }
     public RelayCommand UpdateNowCommand { get; }
     public RelayCommand OpenReleaseCommand { get; }
+
+    private string _detectStatus = "";
+    public string DetectStatus { get => _detectStatus; private set => SetProperty(ref _detectStatus, value); }
 
     private MeterRow? _selectedRow;
     public MeterRow? SelectedRow
@@ -106,6 +112,32 @@ public sealed class SetupViewModel : ViewModelBase
     {
         if (SelectedRow is not { } row) return;
         if (row.Meter.IsConnected) row.Meter.Disconnect(); else row.Meter.Connect();
+    }
+
+    private async Task DetectAsync()
+    {
+        if (Application.Current is not App app) return;
+        var ok = await app.ConfirmAsync("Detect W2 meters",
+            "Detect opens every free serial port and briefly asserts its control lines to look " +
+            "for a W2. This can momentarily key a radio or cycle other gear on a CAT/PTT port. " +
+            "Continue?");
+        if (!ok) return;
+
+        DetectStatus = "Scanning ports…";
+        var skip = _manager.Meters.Where(m => m.Port is not null)
+            .Select(m => m.Port!).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var found = await Task.Run(() => W2Probe.Detect(MeterService.GetPortNames(), skip));
+
+        var added = 0;
+        foreach (var port in found)
+        {
+            if (_manager.Meters.Any(m => string.Equals(m.Port, port, StringComparison.OrdinalIgnoreCase))) continue;
+            var m = _manager.Add($"W2 #{_manager.Meters.Count + 1}", port);
+            m.Connect();
+            added++;
+        }
+        DetectStatus = added > 0 ? $"Found {added} new meter(s)." : "No new W2 meters found.";
+        RefreshPorts();
     }
 
     private void RefreshPorts()

@@ -112,6 +112,14 @@ public partial class App : Application
     /// <summary>Close the app so the staged update helper can swap the executable and relaunch.</summary>
     public void ExitForUpdate() => _mainWindow.Close();
 
+    /// <summary>Modal yes/no confirmation, owned by the topmost app window.</summary>
+    public Task<bool> ConfirmAsync(string title, string message)
+    {
+        var owner = (Window?)_setupWindow ?? _mainWindow;
+        var dlg = new ConfirmWindow(title, message) { Topmost = _display.AlwaysOnTop };
+        return dlg.ShowDialog<bool>(owner);
+    }
+
     private void OnDisplayChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(DisplaySettings.AlwaysOnTop))

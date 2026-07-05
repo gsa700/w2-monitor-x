@@ -1,0 +1,17 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="W2.App.Views.ConfirmWindow"
+        Width="400" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgBrush}"
+        Icon="/Assets/app.ico"
+        Title="Confirm">
+
+  <StackPanel Margin="18,16" Spacing="16">
+    <TextBlock x:Name="MessageText" TextWrapping="Wrap" Foreground="{StaticResource TextBrush}"/>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="Cancel" Click="OnCancel" Width="90"/>
+      <Button Content="Continue" Click="OnContinue" Width="90"/>
+    </StackPanel>
+  </StackPanel>
+</Window>

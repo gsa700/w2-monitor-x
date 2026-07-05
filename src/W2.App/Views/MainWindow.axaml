@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:W2.App.ViewModels"
+        xmlns:ctl="using:W2.App.Controls"
         x:Class="W2.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Width="470" SizeToContent="Height" CanResize="False"
@@ -45,17 +46,11 @@
       </StackPanel>
     </Grid>
 
-    <!-- Bars: full-width forward power, thin SWR strip below -->
-    <StackPanel Grid.Row="3" Spacing="2" Margin="0,10,0,0">
-      <ProgressBar Minimum="0" Maximum="{Binding PowerBarMax}" Value="{Binding PowerBarValue}"
-                   Height="14" ShowProgressText="False"
-                   Foreground="{StaticResource BlueBrush}" Background="{StaticResource TrackBrush}"
-                   IsVisible="{Binding Display.ShowPowerBar}"/>
-      <ProgressBar Minimum="1" Maximum="3" Value="{Binding SwrBarValue}"
-                   Height="7" ShowProgressText="False"
-                   Foreground="{StaticResource GoldBrush}" Background="{StaticResource TrackBrush}"
-                   IsVisible="{Binding Display.ShowSwrBar}"/>
-    </StackPanel>
+    <!-- Bars: full-width forward power with cyan peak-hold marker, thin SWR strip below -->
+    <ctl:PowerSwrBar Grid.Row="3" Margin="0,10,0,0" HorizontalAlignment="Stretch"
+                     Value="{Binding PowerBarValue}" Max="{Binding PowerBarMax}"
+                     HeldPeak="{Binding HeldPeakValue}" Swr="{Binding SwrBarValue}"
+                     ShowPowerBar="{Binding Display.ShowPowerBar}" ShowSwrBar="{Binding Display.ShowSwrBar}"/>
 
     <!-- Secondary rows -->
     <StackPanel Grid.Row="4" Margin="0,12,0,0">

@@ -63,6 +63,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     private double _swrBarValue = 1.0;
     public double SwrBarValue { get => _swrBarValue; private set => SetProperty(ref _swrBarValue, value); }
 
+    private double _heldPeakValue;
+    public double HeldPeakValue { get => _heldPeakValue; private set => SetProperty(ref _heldPeakValue, value); }
+
     private string _reflectedText = "— W";
     public string ReflectedText { get => _reflectedText; private set => SetProperty(ref _reflectedText, value); }
 
@@ -96,6 +99,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         PowerText = m.LastForwardW is { } f ? $"{f:0.0} W" : "— W";
         PowerBarValue = m.LastForwardW ?? 0;
         PowerBarMax = m.FullScaleW;
+        HeldPeakValue = m.HeldPeakW;
 
         if (m.LastSwr is { } swr)
         {
@@ -134,7 +138,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         PowerText = "— W"; SwrText = "—"; SwrBrush = Palette.DimBrush;
         ReflectedText = "— W"; ReturnLossText = "— dB"; PeakText = "0.0 W";
-        PowerBarValue = 0; SwrBarValue = 1.0; StatusLineText = "—"; TxBrush = Palette.DimBrush;
+        PowerBarValue = 0; SwrBarValue = 1.0; HeldPeakValue = 0; StatusLineText = "—"; TxBrush = Palette.DimBrush;
         TxTimerText = "0:00";
     }
 }

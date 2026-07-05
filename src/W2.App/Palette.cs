@@ -18,6 +18,7 @@ public static class Palette
     public static readonly Color Red = Color.FromRgb(0xEB, 0x46, 0x46);
     public static readonly Color Dim = Color.FromRgb(0x8C, 0x8C, 0x94);
     public static readonly Color Cyan = Color.FromRgb(0x00, 0xD2, 0xEB);
+    public static readonly Color Blue = Color.FromRgb(0x4A, 0x90, 0xE2);   // forward-power bar fill
 
     public static readonly IBrush AmberBrush = new SolidColorBrush(Amber);
     public static readonly IBrush GreenBrush = new SolidColorBrush(Green);
@@ -25,4 +26,7 @@ public static class Palette
     public static readonly IBrush DimBrush = new SolidColorBrush(Dim);
     public static readonly IBrush TextBrush = new SolidColorBrush(Text);
     public static readonly IBrush CyanBrush = new SolidColorBrush(Cyan);
+    public static readonly IBrush TrackBrush = new SolidColorBrush(Track);
+    public static readonly IBrush BlueBrush = new SolidColorBrush(Blue);
+    public static readonly IBrush GoldBrush = new SolidColorBrush(Amber);  // SWR bar (same amber/gold)
 }

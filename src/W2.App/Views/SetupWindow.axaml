@@ -38,6 +38,12 @@
       <Button Grid.Column="3" Content="Disc. All" Command="{Binding DisconnectAllCommand}" HorizontalAlignment="Stretch" Margin="3,0,0,0"/>
     </Grid>
 
+    <Grid ColumnDefinitions="Auto,*">
+      <Button Grid.Column="0" Content="Detect W2s…" Command="{Binding DetectCommand}"/>
+      <TextBlock Grid.Column="1" Text="{Binding DetectStatus}" Foreground="{StaticResource DimBrush}"
+                 VerticalAlignment="Center" Margin="10,0,0,0" TextTrimming="CharacterEllipsis"/>
+    </Grid>
+
     <!-- Selected meter: port assignment + connect -->
     <TextBlock Text="SELECTED METER — PORT" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}"/>
     <Grid ColumnDefinitions="*,Auto,Auto">

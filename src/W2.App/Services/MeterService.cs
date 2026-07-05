@@ -34,6 +34,10 @@ public sealed class MeterService : IDisposable
     public double SessionPeakW { get; private set; }
     public double OverPeakW { get; private set; }
 
+    // App-side peak-hold: jumps to any new peak, holds ~1.5 s, then eases toward the live value.
+    public double HeldPeakW { get; private set; }
+    private DateTime _heldPeakAt;
+
     // Last-good numerics (hold across per-field serial dropouts).
     public double? LastForwardW { get; private set; }
     public double? LastReflectedW { get; private set; }
@@ -107,6 +111,7 @@ public sealed class MeterService : IDisposable
         IsTransmitting = false;
         Current = null;
         LastForwardW = LastReflectedW = LastSwr = null;
+        HeldPeakW = 0; _heldPeakAt = default;
         SensorLabel = TypeLabel = RangeLabel = "—";
         Alarm = false;
         _seeded = false;
@@ -115,7 +120,7 @@ public sealed class MeterService : IDisposable
         StateChanged?.Invoke(this);
     }
 
-    public void ResetPeak() => SessionPeakW = 0;
+    public void ResetPeak() { SessionPeakW = 0; HeldPeakW = 0; _heldPeakAt = default; }
 
     private void TrackTx(W2Reading r)
     {
@@ -124,6 +129,17 @@ public sealed class MeterService : IDisposable
         if (r.ReflectedPowerW is { } refl) LastReflectedW = refl;
         if (r.Swr is { } swr) LastSwr = swr;
         if (r.ForwardPowerW is { } f && f > SessionPeakW) SessionPeakW = f;
+
+        // App-side peak-hold (ports W2App.ps1:532-537): jump up instantly, hold ~1.5 s, ease down.
+        if (r.ForwardPowerW is { } hp)
+        {
+            if (hp >= HeldPeakW) { HeldPeakW = hp; _heldPeakAt = now; }
+            else if (_heldPeakAt != default && (now - _heldPeakAt).TotalSeconds > 1.5)
+            {
+                HeldPeakW -= (HeldPeakW - hp) * 0.34;
+                if (HeldPeakW < hp) HeldPeakW = hp;
+            }
+        }
 
         if (r.IsTransmitting)
         {
