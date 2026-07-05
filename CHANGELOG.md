@@ -3,6 +3,21 @@
 Cross-platform **W2 Monitor** (.NET 8 + Avalonia). Companion to the original PowerShell
 app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
+## [0.3.1-beta] - 2026-07-05
+
+UI polish and out-of-the-box usability from first dogfooding.
+
+### Changed
+- **Main window header:** the "W2 MONITOR" title is now amber (matching the Setup control
+  lamps) with the glow removed; the redundant "· Connected on COMx" text is gone (that lives
+  in Setup); the connection dot moved to sit immediately left of the Setup button.
+- **Line 2** now leads with the focused meter's name when more than one meter is connected
+  (which W2 is in use), and shows Disconnected / No meters there when nothing is live.
+- **Accent color:** line 2 and the forward-power bar now use the theme accent — the same blue
+  as the Setup meter-list selection — and track the OS accent.
+- **Auto-select the first meter** in Setup on load, so the W2 controls are usable immediately
+  without a manual pick (most users have a single W2, which also auto-connects on launch).
+
 ## [0.3.0-beta] - 2026-07-05
 
 Promoted to **beta** for dogfooding. Same feature set as 0.2.0-alpha, now the first public
