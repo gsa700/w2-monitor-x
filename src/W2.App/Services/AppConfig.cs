@@ -1,8 +1,9 @@
 using System.Text.Json;
+using W2.App.Settings;
 
 namespace W2.App.Services;
 
-/// <summary>Persisted state: window bounds, the meter list, and misc flags.</summary>
+/// <summary>Persisted state: window bounds, the meter list, display flags, and misc.</summary>
 public sealed class AppConfig
 {
     public double? X { get; set; }
@@ -12,10 +13,37 @@ public sealed class AppConfig
 
     public List<MeterConfig> Meters { get; set; } = new();
     public bool CheckUpdatesAtStartup { get; set; }
+    public DisplayConfig Display { get; set; } = new();
 
     // --- legacy single-meter fields (Phase 2 config); migrated on load ---
     public string? Port { get; set; }
     public string? Serial { get; set; }
+
+    public void ApplyTo(DisplaySettings d)
+    {
+        d.ShowStatusLine = Display.ShowStatusLine;
+        d.ShowPowerBar = Display.ShowPowerBar;
+        d.ShowSwrBar = Display.ShowSwrBar;
+        d.ShowReflected = Display.ShowReflected;
+        d.ShowReturnLoss = Display.ShowReturnLoss;
+        d.ShowPeak = Display.ShowPeak;
+        d.ShowTx = Display.ShowTx;
+        d.TimeoutSec = Display.TimeoutSec;
+        d.AlwaysOnTop = Display.AlwaysOnTop;
+    }
+
+    public void CaptureFrom(DisplaySettings d)
+    {
+        Display.ShowStatusLine = d.ShowStatusLine;
+        Display.ShowPowerBar = d.ShowPowerBar;
+        Display.ShowSwrBar = d.ShowSwrBar;
+        Display.ShowReflected = d.ShowReflected;
+        Display.ShowReturnLoss = d.ShowReturnLoss;
+        Display.ShowPeak = d.ShowPeak;
+        Display.ShowTx = d.ShowTx;
+        Display.TimeoutSec = d.TimeoutSec;
+        Display.AlwaysOnTop = d.AlwaysOnTop;
+    }
 
     /// <summary>Fold a pre-multi-meter config (single Port/Serial) into the Meters list.</summary>
     public void MigrateLegacy()
@@ -35,6 +63,20 @@ public sealed class MeterConfig
     public string Name { get; set; } = "W2";
     public string? Port { get; set; }
     public string? Serial { get; set; }
+}
+
+/// <summary>Plain (serializable) mirror of <see cref="DisplaySettings"/>.</summary>
+public sealed class DisplayConfig
+{
+    public bool ShowStatusLine { get; set; } = true;
+    public bool ShowPowerBar { get; set; } = true;
+    public bool ShowSwrBar { get; set; } = true;
+    public bool ShowReflected { get; set; } = true;
+    public bool ShowReturnLoss { get; set; } = true;
+    public bool ShowPeak { get; set; } = true;
+    public bool ShowTx { get; set; } = true;
+    public int TimeoutSec { get; set; } = 180;
+    public bool AlwaysOnTop { get; set; }
 }
 
 public static class ConfigStore

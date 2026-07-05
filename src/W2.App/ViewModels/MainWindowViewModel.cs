@@ -1,32 +1,40 @@
 using Avalonia.Media;
+using Avalonia.Threading;
 using W2.App.Services;
+using W2.App.Settings;
+using W2.Core;
 
 namespace W2.App.ViewModels;
 
 /// <summary>
-/// Phase 3: renders whichever meter the <see cref="MeterManager"/> has in focus. All per-meter
-/// state (last-good numerics, TX/peak, the anti-strobe sensor·type·range labels) lives on the
-/// meter, so this is a thin formatter that just reflects the focused meter and updates when the
-/// manager says focus or its reading changed.
+/// Renders whichever meter the <see cref="MeterManager"/> has in focus. Per-meter state lives on
+/// the meter, so this is a thin formatter. A 500 ms tick keeps the TX timer counting smoothly and
+/// drives the flashing over-time state even when readings pause.
 /// </summary>
 public sealed class MainWindowViewModel : ViewModelBase
 {
     private readonly MeterManager _manager;
+    private readonly DispatcherTimer _tick;
+    private bool _flashOn;
 
-    public MainWindowViewModel(MeterManager manager)
+    public MainWindowViewModel(MeterManager manager, DisplaySettings display)
     {
         _manager = manager;
+        Display = display;
         _manager.FocusReadingUpdated += Render;
         _manager.MetersChanged += Render;
         ResetPeakCommand = new RelayCommand(() => _manager.Focus?.ResetPeak());
+
+        _tick = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        _tick.Tick += (_, _) => { _flashOn = !_flashOn; UpdateTx(); };
+        _tick.Start();
+
         Render();
     }
 
     public string TitleText => "W2 MONITOR";
+    public DisplaySettings Display { get; }
     public RelayCommand ResetPeakCommand { get; }
-
-    private string _meterNameText = "";
-    public string MeterNameText { get => _meterNameText; private set => SetProperty(ref _meterNameText, value); }
 
     private string _statusText = "No meters — open Setup";
     public string StatusText { get => _statusText; private set => SetProperty(ref _statusText, value); }
@@ -75,14 +83,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         var m = _manager.Focus;
         if (m is null || !m.IsConnected)
         {
-            MeterNameText = m?.Name ?? "";
             StatusText = _manager.Meters.Count == 0 ? "No meters — open Setup" : "Disconnected";
             ConnDotBrush = Palette.DimBrush;
             Blank();
             return;
         }
 
-        MeterNameText = m.Name;
         StatusText = m.StatusIsError ? m.Status : $"{m.Name} · {m.Status}";
         ConnDotBrush = m.StatusIsError ? Palette.RedBrush
             : m.Current is not null ? Palette.GreenBrush : Palette.AmberBrush;
@@ -104,9 +110,24 @@ public sealed class MainWindowViewModel : ViewModelBase
         PeakText = $"{m.SessionPeakW:0.0} W";
         StatusLineText = m.Alarm ? "⚠ SWR ALARM" : $"{m.SensorLabel} · {m.TypeLabel} · {m.RangeLabel}";
 
-        TxBrush = m.IsTransmitting ? Palette.AmberBrush : Palette.DimBrush;
-        var span = m.TxElapsed;
-        TxTimerText = $"{(int)span.TotalMinutes}:{span.Seconds:00}";
+        UpdateTx();
+    }
+
+    /// <summary>TX timer text + color, incl. the yellow→flashing-red timeout states.</summary>
+    private void UpdateTx()
+    {
+        var m = _manager.Focus;
+        if (m is null || !m.IsConnected) { TxTimerText = "0:00"; TxBrush = Palette.DimBrush; return; }
+
+        TxTimerText = TxTimer.Format(m.TxElapsed);
+        var alert = TxTimer.Evaluate(m.IsTransmitting, m.TxElapsed.TotalSeconds, Display.TimeoutSec);
+        TxBrush = alert switch
+        {
+            TxAlert.Over => _flashOn ? Palette.RedBrush : Palette.DimBrush,   // flashing red at/after TOT
+            TxAlert.Warning => Palette.AmberBrush,                            // solid yellow, last 30 s
+            TxAlert.Normal => Palette.GreenBrush,
+            _ => Palette.DimBrush,
+        };
     }
 
     private void Blank()

@@ -27,7 +27,8 @@
 
     <!-- Status line: sensor · type · range (focused meter) -->
     <TextBlock Grid.Row="1" Text="{Binding StatusLineText}" Foreground="{StaticResource CyanBrush}"
-               FontFamily="Consolas" FontSize="13" Margin="0,10,0,0"/>
+               FontFamily="Consolas" FontSize="13" Margin="0,10,0,0"
+               IsVisible="{Binding Display.ShowStatusLine}"/>
 
     <!-- Hero readouts -->
     <Grid Grid.Row="2" ColumnDefinitions="*,*" Margin="0,10,0,0">
@@ -48,27 +49,29 @@
     <StackPanel Grid.Row="3" Spacing="2" Margin="0,10,0,0">
       <ProgressBar Minimum="0" Maximum="{Binding PowerBarMax}" Value="{Binding PowerBarValue}"
                    Height="14" ShowProgressText="False"
-                   Foreground="{StaticResource BlueBrush}" Background="{StaticResource TrackBrush}"/>
+                   Foreground="{StaticResource BlueBrush}" Background="{StaticResource TrackBrush}"
+                   IsVisible="{Binding Display.ShowPowerBar}"/>
       <ProgressBar Minimum="1" Maximum="3" Value="{Binding SwrBarValue}"
                    Height="7" ShowProgressText="False"
-                   Foreground="{StaticResource GoldBrush}" Background="{StaticResource TrackBrush}"/>
+                   Foreground="{StaticResource GoldBrush}" Background="{StaticResource TrackBrush}"
+                   IsVisible="{Binding Display.ShowSwrBar}"/>
     </StackPanel>
 
     <!-- Secondary rows -->
     <StackPanel Grid.Row="4" Margin="0,12,0,0">
-      <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,6">
+      <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,6" IsVisible="{Binding Display.ShowTx}">
         <TextBlock Grid.Column="0" Text="TX TIMER" Width="150" FontSize="11" FontWeight="Bold" Foreground="{StaticResource DimBrush}" VerticalAlignment="Center"/>
         <TextBlock Grid.Column="1" Text="{Binding TxTimerText}" FontFamily="Consolas" FontSize="16" FontWeight="Bold" Foreground="{Binding TxBrush}" HorizontalAlignment="Right"/>
       </Grid>
-      <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,6">
+      <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,6" IsVisible="{Binding Display.ShowReflected}">
         <TextBlock Grid.Column="0" Text="REFLECTED POWER" Width="150" FontSize="11" FontWeight="Bold" Foreground="{StaticResource DimBrush}" VerticalAlignment="Center"/>
         <TextBlock Grid.Column="1" Text="{Binding ReflectedText}" FontFamily="Consolas" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextBrush}" HorizontalAlignment="Right"/>
       </Grid>
-      <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,6">
+      <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,6" IsVisible="{Binding Display.ShowReturnLoss}">
         <TextBlock Grid.Column="0" Text="RETURN LOSS" Width="150" FontSize="11" FontWeight="Bold" Foreground="{StaticResource DimBrush}" VerticalAlignment="Center"/>
         <TextBlock Grid.Column="1" Text="{Binding ReturnLossText}" FontFamily="Consolas" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextBrush}" HorizontalAlignment="Right"/>
       </Grid>
-      <Grid ColumnDefinitions="Auto,Auto,*" Margin="0,0,0,2">
+      <Grid ColumnDefinitions="Auto,Auto,*" Margin="0,0,0,2" IsVisible="{Binding Display.ShowPeak}">
         <TextBlock Grid.Column="0" Text="PEAK FORWARD" Width="150" FontSize="11" FontWeight="Bold" Foreground="{StaticResource DimBrush}" VerticalAlignment="Center"/>
         <Button Grid.Column="1" Content="reset" Command="{Binding ResetPeakCommand}" Padding="6,2" FontSize="10"
                 Background="Transparent" Foreground="{StaticResource DimBrush}" VerticalAlignment="Center"/>

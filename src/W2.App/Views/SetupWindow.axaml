@@ -50,5 +50,34 @@
     <TextBlock Text="The main display auto-follows whichever meter is transmitting; pick one here to pin it."
                Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
 
+    <!-- Display toggles -->
+    <TextBlock Text="DISPLAY" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}" Margin="0,4,0,0"/>
+    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto">
+      <CheckBox Grid.Row="0" Grid.Column="0" Content="Status line" IsChecked="{Binding Display.ShowStatusLine, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+      <CheckBox Grid.Row="0" Grid.Column="1" Content="Power bar" IsChecked="{Binding Display.ShowPowerBar, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+      <CheckBox Grid.Row="1" Grid.Column="0" Content="SWR bar" IsChecked="{Binding Display.ShowSwrBar, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+      <CheckBox Grid.Row="1" Grid.Column="1" Content="Reflected power" IsChecked="{Binding Display.ShowReflected, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+      <CheckBox Grid.Row="2" Grid.Column="0" Content="Return loss" IsChecked="{Binding Display.ShowReturnLoss, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+      <CheckBox Grid.Row="2" Grid.Column="1" Content="Peak forward" IsChecked="{Binding Display.ShowPeak, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+      <CheckBox Grid.Row="3" Grid.Column="0" Content="TX timer" IsChecked="{Binding Display.ShowTx, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+      <CheckBox Grid.Row="3" Grid.Column="1" Content="Always on top" IsChecked="{Binding Display.AlwaysOnTop, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+    </Grid>
+
+    <Grid ColumnDefinitions="Auto,Auto,*">
+      <TextBlock Grid.Column="0" Text="TX timeout (s)" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+      <NumericUpDown Grid.Column="1" Minimum="30" Maximum="1800" Increment="10" Width="130"
+                     Value="{Binding Display.TimeoutSec, Mode=TwoWay}"/>
+    </Grid>
+
+    <!-- Updates -->
+    <TextBlock Text="UPDATES" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}" Margin="0,4,0,0"/>
+    <TextBlock Text="{Binding UpdateStatus}" Foreground="{Binding UpdateStatusBrush}" TextWrapping="Wrap"/>
+    <Grid ColumnDefinitions="Auto,Auto,Auto,*">
+      <Button Grid.Column="0" Content="Check for updates" Command="{Binding CheckUpdatesCommand}"/>
+      <Button Grid.Column="1" Content="Update now" Command="{Binding UpdateNowCommand}" IsVisible="{Binding UpdateAvailable}" Margin="6,0,0,0"/>
+      <Button Grid.Column="2" Content="Release page" Command="{Binding OpenReleaseCommand}" Margin="6,0,0,0"/>
+    </Grid>
+    <CheckBox Content="Check for updates at startup" IsChecked="{Binding CheckUpdatesAtStartup, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+
   </StackPanel>
 </Window>
