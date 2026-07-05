@@ -121,7 +121,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         var current = SelectedPort;
         Ports.Clear();
-        foreach (var p in MeterService.GetPortNames().OrderBy(x => x))
+        foreach (var p in _meter.AvailablePorts().OrderBy(x => x))
             Ports.Add(p);
         SelectedPort = current is not null && Ports.Contains(current) ? current : Ports.FirstOrDefault();
     }

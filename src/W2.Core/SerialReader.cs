@@ -14,7 +14,7 @@ namespace W2.Core;
 /// Serial params and the query set come from W2App.ps1 (9600 8N1; DtrEnable/RtsEnable;
 /// per-cycle F/R/S/I queries).
 /// </summary>
-public sealed class SerialReader : IDisposable
+public sealed class SerialReader : IReadingSource
 {
     private const int BaudRate = 9600;          // W2App.ps1:134
     private const int PollIntervalMs = 80;      // W2App.ps1:166

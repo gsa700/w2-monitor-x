@@ -21,6 +21,9 @@ src/
 ```sh
 dotnet build
 dotnet run --project src/W2.App
+
+# No W2 on the bench? Drive the UI from a built-in synthetic meter:
+dotnet run --project src/W2.App -- --sim
 ```
 
 ## Publish (self-contained)

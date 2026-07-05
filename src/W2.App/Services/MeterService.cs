@@ -11,7 +11,10 @@ namespace W2.App.Services;
 /// </summary>
 public sealed class MeterService : IDisposable
 {
-    private readonly SerialReader _reader = new();
+    private readonly IReadingSource _reader;
+
+    /// <summary>True when driven by the synthetic <see cref="W2SimReader"/> instead of a real port.</summary>
+    public bool IsSimulated { get; }
 
     public W2Reading? Current { get; private set; }
     public bool IsConnected { get; private set; }
@@ -25,8 +28,11 @@ public sealed class MeterService : IDisposable
     /// <summary>Fires on the UI thread when connection/status changes.</summary>
     public event Action? StateChanged;
 
-    public MeterService()
+    public MeterService(bool simulated = false)
     {
+        IsSimulated = simulated;
+        _reader = simulated ? new W2SimReader() : new SerialReader();
+
         _reader.ReadingReceived += r => Dispatcher.UIThread.Post(() =>
         {
             Current = r;
@@ -43,6 +49,9 @@ public sealed class MeterService : IDisposable
     }
 
     public static string[] GetPortNames() => SerialReader.GetPortNames();
+
+    /// <summary>Ports offered in the UI: the synthetic "SIM" port in simulator mode, else real COM ports.</summary>
+    public string[] AvailablePorts() => IsSimulated ? new[] { "SIM" } : GetPortNames();
 
     public void Connect(string port)
     {

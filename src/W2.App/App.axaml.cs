@@ -23,14 +23,27 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             _config = ConfigStore.Load();
-            _meter = new MeterService();
+
+            // `--sim` drives the UI from a synthetic W2 (no hardware needed).
+            var simulated = Environment.GetCommandLineArgs()
+                .Any(a => a.Equals("--sim", StringComparison.OrdinalIgnoreCase));
+
+            _meter = new MeterService(simulated);
             _mainVm = new MainWindowViewModel(_meter);
 
-            // Follow the cable by its chip serial across COM renumbering, then auto-connect.
-            var startupPort = PortIdentity.ResolvePort(_config.Port, _config.Serial);
-            _mainVm.SelectPort(startupPort);
-            if (startupPort is not null && MeterService.GetPortNames().Contains(startupPort))
-                _meter.Connect(startupPort);
+            if (simulated)
+            {
+                _mainVm.SelectPort("SIM");
+                _meter.Connect("SIM");
+            }
+            else
+            {
+                // Follow the cable by its chip serial across COM renumbering, then auto-connect.
+                var startupPort = PortIdentity.ResolvePort(_config.Port, _config.Serial);
+                _mainVm.SelectPort(startupPort);
+                if (startupPort is not null && MeterService.GetPortNames().Contains(startupPort))
+                    _meter.Connect(startupPort);
+            }
 
             _mainWindow = new MainWindow { DataContext = _mainVm };
             RestoreMainBounds(_mainWindow);
