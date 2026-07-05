@@ -4,8 +4,11 @@ Dogfooding feedback and small improvements, batched into releases.
 
 ## Open
 
-- **Setup meter list: show the FTDI serial after the COM port.** The row currently reads
-  `W2 #1 · COM4`; append the cable's chip serial like the earlier PowerShell version did, e.g.
-  `W2 #1 · COM4 (A10KMB4VA)`. (Source: `MeterRow.Text` in `SetupViewModel.cs`, from `Meter.Serial`.)
-  Note for implementation: on Linux the "serial" is the longer `/dev/serial/by-id` name — may want
-  to shorten or show only on Windows.
+_(nothing right now)_
+
+## Done
+
+- **Setup meter list shows the cable serial after the COM port** (v0.3.2-beta) — e.g.
+  `W2 #1 · COM4 (A10KMB4VA)`. On Linux the long `/dev/serial/by-id` name is shortened to the
+  embedded serial with a leading `…` (e.g. `…A10KMB4VA`) to stay about the Windows length.
+  (`SerialDisplay.Shorten` in W2.Core; used by `MeterRow`.)

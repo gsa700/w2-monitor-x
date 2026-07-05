@@ -306,7 +306,9 @@ public sealed class MeterRow : ViewModelBase
 
     public void Update()
     {
-        Text = $"{Meter.Name}  ·  {Meter.Port ?? "unassigned"}";
+        var port = Meter.Port ?? "unassigned";
+        var serial = SerialDisplay.Shorten(Meter.Serial);
+        Text = serial is null ? $"{Meter.Name}  ·  {port}" : $"{Meter.Name}  ·  {port}  ({serial})";
         StatusText = Meter.Status;
         DotBrush = Meter.StatusIsError ? Palette.RedBrush
             : Meter is { IsConnected: true, Current: not null } ? Palette.GreenBrush
