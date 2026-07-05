@@ -33,6 +33,14 @@ public sealed class SetupViewModel : ViewModelBase
         RefreshCommand = new RelayCommand(RefreshPorts);
         DetectCommand = new RelayCommand(() => _ = DetectAsync(), () => !_manager.IsSimulated);
 
+        SearchCommand = new RelayCommand(() => SelectedRow?.Meter.ToggleSearch(), () => CanControl);
+        AutoRangeCommand = new RelayCommand(() => SelectedRow?.Meter.ToggleAutoRange(), () => CanControl);
+        AvgPepCommand = new RelayCommand(() => SelectedRow?.Meter.ToggleAvgPep(), () => CanControl);
+        SensorCommand = new RelayCommand(() => SelectedRow?.Meter.SwitchSensor(), () => CanControl);
+        RangeCommand = new RelayCommand(() => SelectedRow?.Meter.StepRange(), () => CanControl);
+        LedsCommand = new RelayCommand(() => SelectedRow?.Meter.ToggleLeds(), () => CanControl);
+        ResetPeakCommand = new RelayCommand(() => _manager.Focus?.ResetPeak());
+
         CheckUpdatesCommand = new RelayCommand(() => _ = CheckUpdatesAsync(), () => !_updateBusy);
         UpdateNowCommand = new RelayCommand(() => _ = UpdateNowAsync(), () => _updateInfo?.AssetUrl is not null && !_updateBusy);
         OpenReleaseCommand = new RelayCommand(OpenRelease);
@@ -53,9 +61,40 @@ public sealed class SetupViewModel : ViewModelBase
     public RelayCommand DisconnectAllCommand { get; }
     public RelayCommand RefreshCommand { get; }
     public RelayCommand DetectCommand { get; }
+    public RelayCommand SearchCommand { get; }
+    public RelayCommand AutoRangeCommand { get; }
+    public RelayCommand AvgPepCommand { get; }
+    public RelayCommand SensorCommand { get; }
+    public RelayCommand RangeCommand { get; }
+    public RelayCommand LedsCommand { get; }
+    public RelayCommand ResetPeakCommand { get; }
     public RelayCommand CheckUpdatesCommand { get; }
     public RelayCommand UpdateNowCommand { get; }
     public RelayCommand OpenReleaseCommand { get; }
+
+    // W2 control lamp state (reflects the selected meter).
+    public bool CanControl => SelectedRow?.Meter is { IsConnected: true };
+    public IBrush AutoRangeBrush => LampBrush(SelectedRow?.Meter is { AutoRangeOn: true });
+    public IBrush LedsBrush => LampBrush(SelectedRow?.Meter is { LedsOn: true });
+    public IBrush SearchBrush => LampBrush(SelectedRow?.Meter?.Search == true);
+    public string AvgPepLabel => SelectedRow?.Meter?.Pep switch { true => "PEP", false => "AVG", _ => "Avg / PEP" };
+
+    private static IBrush LampBrush(bool on) => on ? Palette.AmberBrush : Palette.PanelBrush;
+
+    private MeterService? _controlMeter;
+
+    private void OnControlMeterReading(MeterService m) => RefreshControls();
+
+    private void RefreshControls()
+    {
+        OnPropertyChanged(nameof(CanControl));
+        OnPropertyChanged(nameof(AutoRangeBrush));
+        OnPropertyChanged(nameof(LedsBrush));
+        OnPropertyChanged(nameof(SearchBrush));
+        OnPropertyChanged(nameof(AvgPepLabel));
+        foreach (var c in new[] { SearchCommand, AutoRangeCommand, AvgPepCommand, SensorCommand, RangeCommand, LedsCommand })
+            c.RaiseCanExecuteChanged();
+    }
 
     private string _detectStatus = "";
     public string DetectStatus { get => _detectStatus; private set => SetProperty(ref _detectStatus, value); }
@@ -74,9 +113,15 @@ public sealed class SetupViewModel : ViewModelBase
             SelectedPort = value?.Meter.Port;
             _syncingSelection = false;
 
+            // Follow the selected meter's readings so the control lamps stay live.
+            if (_controlMeter is not null) _controlMeter.ReadingReceived -= OnControlMeterReading;
+            _controlMeter = value?.Meter;
+            if (_controlMeter is not null) _controlMeter.ReadingReceived += OnControlMeterReading;
+
             RemoveCommand.RaiseCanExecuteChanged();
             ToggleConnectCommand.RaiseCanExecuteChanged();
             OnPropertyChanged(nameof(ToggleConnectLabel));
+            RefreshControls();
         }
     }
 
@@ -165,6 +210,7 @@ public sealed class SetupViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(ToggleConnectLabel));
         ToggleConnectCommand.RaiseCanExecuteChanged();
+        RefreshControls();
     }
 
     // --- updates ---

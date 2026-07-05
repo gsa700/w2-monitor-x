@@ -16,6 +16,8 @@ public sealed class W2SimReader : IReadingSource
     private readonly double _phaseOffset;
     private Thread? _thread;
     private volatile bool _running;
+    private bool _pep;
+    private bool _search = true;
 
     /// <param name="phaseOffsetSeconds">Shifts the idle/TX cycle so multiple sims alternate overs.</param>
     public W2SimReader(double phaseOffsetSeconds = 0) => _phaseOffset = phaseOffsetSeconds;
@@ -38,6 +40,13 @@ public sealed class W2SimReader : IReadingSource
         _running = false;
         try { _thread?.Join(500); } catch { /* ignore */ }
         _thread = null;
+    }
+
+    public void Send(char command)
+    {
+        if (command == 'N') _pep = !_pep;
+        else if (command == 'Y') _search = !_search;
+        // other commands (O/0/1/2/3/L) have no visible effect in the sim
     }
 
     private void Loop()
@@ -83,7 +92,7 @@ public sealed class W2SimReader : IReadingSource
             // Occasional serial dropout: a field comes back empty this cycle.
             if (_rnd.NextDouble() < 0.04) { f = ""; r = ""; s = ""; }
 
-            ReadingReceived?.Invoke(W2FrameParser.Build(f, r, s, info));
+            ReadingReceived?.Invoke(W2FrameParser.Build(f, r, s, info) with { Pep = _pep, Search = _search });
             Thread.Sleep(TickMs);
         }
 

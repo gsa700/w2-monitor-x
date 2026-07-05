@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.IO.Ports;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace W2.Core;
 
@@ -20,9 +22,16 @@ public sealed class SerialReader : IReadingSource
     private const int PollIntervalMs = 80;      // W2App.ps1:166
     private const int ReplyTimeoutMs = 200;     // W2App.ps1:135 (ReadTimeout)
 
+    private static readonly Regex NEcho = new(@"[Nn]([AP])", RegexOptions.Compiled);
+    private static readonly Regex YEcho = new(@"[Yy]([01])", RegexOptions.Compiled);
+    private static readonly Regex FwdRf = new(@"[Ff](\d+)D(\d)", RegexOptions.Compiled);
+
+    private readonly ConcurrentQueue<char> _cmds = new();
     private SerialPort? _port;
     private Thread? _thread;
     private volatile bool _running;
+    private bool? _pep;
+    private bool? _search;
 
     public event Action<W2Reading>? ReadingReceived;
     public event Action<string, bool>? StatusChanged;  // (message, isError)
@@ -31,9 +40,14 @@ public sealed class SerialReader : IReadingSource
 
     public static string[] GetPortNames() => SerialPort.GetPortNames();
 
+    public void Send(char command) => _cmds.Enqueue(command);
+
     public void Start(string portName)
     {
         Stop();
+        _pep = null;
+        _search = null;
+        while (_cmds.TryDequeue(out _)) { }
         _running = true;
         _thread = new Thread(() => Loop(portName))
         {
@@ -68,14 +82,16 @@ public sealed class SerialReader : IReadingSource
             Thread.Sleep(120);                 // W2App.ps1:136 — settle after open
             _port.DiscardInBuffer();
             StatusChanged?.Invoke($"Connected on {portName}", false);
+            ProbeToggleStates();
 
             while (_running)
             {
+                DrainCommands();
                 var f = Query('F');
                 var r = Query('R');
                 var s = Query('S');
                 var i = Query('I');
-                ReadingReceived?.Invoke(W2FrameParser.Build(f, r, s, i));
+                ReadingReceived?.Invoke(W2FrameParser.Build(f, r, s, i) with { Pep = _pep, Search = _search });
                 Thread.Sleep(PollIntervalMs);
             }
         }
@@ -88,6 +104,35 @@ public sealed class SerialReader : IReadingSource
             ClosePort();
             if (!_running) StatusChanged?.Invoke("Disconnected", false);
         }
+    }
+
+    /// <summary>Send any queued commands, capturing the N/Y echoes to track Avg-PEP / Search.</summary>
+    private void DrainCommands()
+    {
+        while (_cmds.TryDequeue(out var cmd))
+        {
+            var reply = Query(cmd);
+            if (cmd == 'N' && reply is not null && NEcho.Match(reply) is { Success: true } n) _pep = n.Groups[1].Value == "P";
+            else if (cmd == 'Y' && reply is not null && YEcho.Match(reply) is { Success: true } y) _search = y.Groups[1].Value == "1";
+        }
+    }
+
+    /// <summary>
+    /// The W2 has no read-only query for Avg-PEP or Search, so probe by double-toggling each
+    /// (read the echoed state, then toggle back — net no change). Skipped while transmitting so a
+    /// live reading is never disturbed. Ports W2App.ps1:139-149.
+    /// </summary>
+    private void ProbeToggleStates()
+    {
+        var fr = Query('F');
+        var rf = fr is not null && FwdRf.Match(fr) is { Success: true } m
+                 && long.Parse(m.Groups[1].Value) / Math.Pow(10, m.Groups[2].Value[0] - '0') > 0.5;
+        if (rf) return;
+
+        Query('N');
+        if (Query('N') is { } n && NEcho.Match(n) is { Success: true } nm) _pep = nm.Groups[1].Value == "P";
+        Query('Y');
+        if (Query('Y') is { } y && YEcho.Match(y) is { Success: true } ym) _search = ym.Groups[1].Value == "1";
     }
 
     /// <summary>Write a single command char and read back one ';'-terminated reply.</summary>

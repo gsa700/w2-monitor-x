@@ -56,6 +56,18 @@
     <TextBlock Text="The main display auto-follows whichever meter is transmitting; pick one here to pin it."
                Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
 
+    <!-- W2 controls (act on the selected meter) -->
+    <TextBlock Text="W2 CONTROLS" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}" Margin="0,4,0,0"/>
+    <TextBlock Text="Act on the selected meter (must be connected)." Foreground="{StaticResource DimBrush}" FontSize="11"/>
+    <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto">
+      <Button Grid.Row="0" Grid.Column="0" Content="Auto Sensor" Command="{Binding SearchCommand}" IsEnabled="{Binding CanControl}" Background="{Binding SearchBrush}" HorizontalAlignment="Stretch" Margin="0,0,3,4"/>
+      <Button Grid.Row="0" Grid.Column="1" Content="Auto Range" Command="{Binding AutoRangeCommand}" IsEnabled="{Binding CanControl}" Background="{Binding AutoRangeBrush}" HorizontalAlignment="Stretch" Margin="3,0,3,4"/>
+      <Button Grid.Row="0" Grid.Column="2" Content="{Binding AvgPepLabel}" Command="{Binding AvgPepCommand}" IsEnabled="{Binding CanControl}" HorizontalAlignment="Stretch" Margin="3,0,0,4"/>
+      <Button Grid.Row="1" Grid.Column="0" Content="Manual Sensor" Command="{Binding SensorCommand}" IsEnabled="{Binding CanControl}" HorizontalAlignment="Stretch" Margin="0,0,3,0"/>
+      <Button Grid.Row="1" Grid.Column="1" Content="Manual Range" Command="{Binding RangeCommand}" IsEnabled="{Binding CanControl}" HorizontalAlignment="Stretch" Margin="3,0,3,0"/>
+      <Button Grid.Row="1" Grid.Column="2" Content="LEDs On/Off" Command="{Binding LedsCommand}" IsEnabled="{Binding CanControl}" Background="{Binding LedsBrush}" HorizontalAlignment="Stretch" Margin="3,0,0,0"/>
+    </Grid>
+
     <!-- Display toggles -->
     <TextBlock Text="DISPLAY" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}" Margin="0,4,0,0"/>
     <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto">
@@ -68,6 +80,8 @@
       <CheckBox Grid.Row="3" Grid.Column="0" Content="TX timer" IsChecked="{Binding Display.ShowTx, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
       <CheckBox Grid.Row="3" Grid.Column="1" Content="Always on top" IsChecked="{Binding Display.AlwaysOnTop, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
     </Grid>
+
+    <Button Content="Reset peak forward" Command="{Binding ResetPeakCommand}" HorizontalAlignment="Left"/>
 
     <Grid ColumnDefinitions="Auto,Auto,*">
       <TextBlock Grid.Column="0" Text="TX timeout (s)" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" Margin="0,0,10,0"/>

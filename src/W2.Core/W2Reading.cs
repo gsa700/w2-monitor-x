@@ -31,6 +31,11 @@ public sealed record W2Reading
     public bool AutoRange { get; init; }
     public bool LedsOn { get; init; }
 
+    // Avg/PEP and Search have no read-only query — they're only known from a command echo
+    // (or the connect-time probe). Null = unknown until the first toggle/probe.
+    public bool? Pep { get; init; }
+    public bool? Search { get; init; }
+
     /// <summary>Raw, non-printable-stripped I reply (kept for diagnostics).</summary>
     public string RawInfo { get; init; } = string.Empty;
 

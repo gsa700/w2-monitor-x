@@ -23,7 +23,6 @@ public sealed class MainWindowViewModel : ViewModelBase
         Display = display;
         _manager.FocusReadingUpdated += Render;
         _manager.MetersChanged += Render;
-        ResetPeakCommand = new RelayCommand(() => _manager.Focus?.ResetPeak());
 
         _tick = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         _tick.Tick += (_, _) => { _flashOn = !_flashOn; UpdateTx(); };
@@ -34,7 +33,6 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public string TitleText => "W2 MONITOR";
     public DisplaySettings Display { get; }
-    public RelayCommand ResetPeakCommand { get; }
 
     private string _statusText = "No meters — open Setup";
     public string StatusText { get => _statusText; private set => SetProperty(ref _statusText, value); }

@@ -51,6 +51,14 @@ public sealed class MeterService : IDisposable
     public bool Alarm { get; private set; }
     private bool _seeded;
 
+    // W2 control lamp states. Auto-range/LEDs come from the I-string every frame; Avg-PEP and
+    // Search are echo-tracked (null = unknown until a toggle or the connect probe).
+    public bool AutoRangeOn { get; private set; }
+    public bool LedsOn { get; private set; }
+    public bool? Pep => Current?.Pep;
+    public bool? Search => Current?.Search;
+    private int _rangeStep;
+
     /// <summary>Elapsed of the current over (live) or the last completed one.</summary>
     public TimeSpan TxElapsed
     {
@@ -113,7 +121,7 @@ public sealed class MeterService : IDisposable
         LastForwardW = LastReflectedW = LastSwr = null;
         HeldPeakW = 0; _heldPeakAt = default;
         SensorLabel = TypeLabel = RangeLabel = "—";
-        Alarm = false;
+        Alarm = false; AutoRangeOn = false; LedsOn = false;
         _seeded = false;
         Status = "Disconnected";
         StatusIsError = false;
@@ -121,6 +129,19 @@ public sealed class MeterService : IDisposable
     }
 
     public void ResetPeak() { SessionPeakW = 0; HeldPeakW = 0; _heldPeakAt = default; }
+
+    // --- W2 controls (act on this meter; ignored unless connected). See W2App.ps1:711-716. ---
+    public void ToggleSearch() { if (IsConnected) _reader.Send('Y'); }   // "Auto Sensor"
+    public void ToggleAutoRange() { if (IsConnected) _reader.Send('0'); } // "Auto Range"
+    public void ToggleAvgPep() { if (IsConnected) _reader.Send('N'); }    // "Avg / PEP"
+    public void SwitchSensor() { if (IsConnected) _reader.Send('O'); }    // "Manual Sensor"
+    public void StepRange()                                               // "Manual Range" (cycles 1→2→3)
+    {
+        if (!IsConnected) return;
+        _rangeStep = _rangeStep % 3 + 1;
+        _reader.Send((char)('0' + _rangeStep));
+    }
+    public void ToggleLeds() { if (IsConnected) _reader.Send('L'); }      // "LEDs On/Off"
 
     private void TrackTx(W2Reading r)
     {
@@ -159,7 +180,7 @@ public sealed class MeterService : IDisposable
     /// </summary>
     private void TrackStatus(W2Reading r)
     {
-        if (r.HasStatus) FullScaleW = r.FullScaleW;
+        if (r.HasStatus) { FullScaleW = r.FullScaleW; AutoRangeOn = r.AutoRange; LedsOn = r.LedsOn; }
         Alarm = r.Alarm;
 
         var rfPresent = r.ForwardPowerW is > 0.1;

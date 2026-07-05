@@ -66,11 +66,9 @@
         <TextBlock Grid.Column="0" Text="RETURN LOSS" Width="150" FontSize="11" FontWeight="Bold" Foreground="{StaticResource DimBrush}" VerticalAlignment="Center"/>
         <TextBlock Grid.Column="1" Text="{Binding ReturnLossText}" FontFamily="Consolas" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextBrush}" HorizontalAlignment="Right"/>
       </Grid>
-      <Grid ColumnDefinitions="Auto,Auto,*" Margin="0,0,0,2" IsVisible="{Binding Display.ShowPeak}">
+      <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,2" IsVisible="{Binding Display.ShowPeak}">
         <TextBlock Grid.Column="0" Text="PEAK FORWARD" Width="150" FontSize="11" FontWeight="Bold" Foreground="{StaticResource DimBrush}" VerticalAlignment="Center"/>
-        <Button Grid.Column="1" Content="reset" Command="{Binding ResetPeakCommand}" Padding="6,2" FontSize="10"
-                Background="Transparent" Foreground="{StaticResource DimBrush}" VerticalAlignment="Center"/>
-        <TextBlock Grid.Column="2" Text="{Binding PeakText}" FontFamily="Consolas" FontSize="16" FontWeight="Bold" Foreground="{StaticResource GreenBrush}" HorizontalAlignment="Right"/>
+        <TextBlock Grid.Column="1" Text="{Binding PeakText}" FontFamily="Consolas" FontSize="16" FontWeight="Bold" Foreground="{StaticResource GreenBrush}" HorizontalAlignment="Right"/>
       </Grid>
     </StackPanel>
 

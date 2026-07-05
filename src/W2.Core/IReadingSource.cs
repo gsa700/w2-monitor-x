@@ -14,4 +14,7 @@ public interface IReadingSource : IDisposable
     bool IsRunning { get; }
     void Start(string portName);
     void Stop();
+
+    /// <summary>Queue a single W2 command char (e.g. 'N','Y','O','0','1','L') to send to the meter.</summary>
+    void Send(char command);
 }

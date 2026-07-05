@@ -26,6 +26,7 @@ public static class Palette
     public static readonly IBrush DimBrush = new SolidColorBrush(Dim);
     public static readonly IBrush TextBrush = new SolidColorBrush(Text);
     public static readonly IBrush CyanBrush = new SolidColorBrush(Cyan);
+    public static readonly IBrush PanelBrush = new SolidColorBrush(Panel);
     public static readonly IBrush TrackBrush = new SolidColorBrush(Track);
     public static readonly IBrush BlueBrush = new SolidColorBrush(Blue);
     public static readonly IBrush GoldBrush = new SolidColorBrush(Amber);  // SWR bar (same amber/gold)
