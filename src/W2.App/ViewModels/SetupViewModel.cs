@@ -208,6 +208,11 @@ public sealed class SetupViewModel : ViewModelBase
 
         foreach (var r in Rows) r.Update();
 
+        // Default to the first meter so the W2 controls work without a manual pick — most users
+        // have a single W2. Only when nothing valid is selected, so it never fights a user choice.
+        if ((SelectedRow is null || !Rows.Contains(SelectedRow)) && Rows.Count > 0)
+            SelectedRow = Rows[0];
+
         OnPropertyChanged(nameof(ToggleConnectLabel));
         ToggleConnectCommand.RaiseCanExecuteChanged();
         RefreshControls();
