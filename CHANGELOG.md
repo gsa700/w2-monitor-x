@@ -3,6 +3,17 @@
 Cross-platform **W2 Monitor** (.NET 8 + Avalonia). Companion to the original PowerShell
 app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
+## [0.3.0-beta] - 2026-07-05
+
+Promoted to **beta** for dogfooding. Same feature set as 0.2.0-alpha, now the first public
+"Latest" release so the in-app updater can see it. Windows validated on two live W2s; Linux
+and Raspberry Pi builds run but are still being tested on real hardware.
+
+### Changed
+- Version → 0.3.0-beta; README rewritten for end users (install/features), superseding the old
+  scaffold notes.
+- This is now the sole W2 Monitor line — the PowerShell version is retired/archived.
+
 ## [0.2.0-alpha] - 2026-07-05
 
 First testable build of the cross-platform port. Windows validated against two live W2s;
