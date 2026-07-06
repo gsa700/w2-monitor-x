@@ -8,8 +8,10 @@ Raspberry Pi**. Built with .NET 8 + Avalonia.
 [![License](https://img.shields.io/github/license/gsa700/w2-monitor-x?color=blue)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Raspberry%20Pi-lightgrey)
 
-> **Beta (v0.3.0):** in active use, not yet broadly field-tested. Windows is validated against
-> live hardware; Linux and Raspberry Pi builds run but are still being shaken out on real gear.
+![W2 Monitor main window](docs/main.png)
+
+> **Beta:** in active use, not yet broadly field-tested. Windows is validated against live
+> hardware; Linux and Raspberry Pi builds run but are still being shaken out on real gear.
 > This is the cross-platform successor to the original (now retired) PowerShell
 > [W2 Monitor](https://github.com/gsa700/w2-monitor).
 
@@ -25,6 +27,17 @@ Raspberry Pi**. Built with .NET 8 + Avalonia.
 - **Follows your cable** by its USB chip serial (Windows) or `/dev/serial/by-id` (Linux), so a
   meter keeps its identity across port renumbering.
 - **In-app updater**, display toggles, and window/meter state that persists between sessions.
+
+## Screenshots
+
+Transmitting — live power and SWR with the cyan peak-hold marker riding the bar:
+
+![Transmitting into a dummy load](docs/transmitting.png)
+
+The Setup window — meters (with each cable's serial), W2 controls, display toggles, and the
+in-app updater:
+
+![Main and Setup windows](docs/overview.png)
 
 ## Install
 
