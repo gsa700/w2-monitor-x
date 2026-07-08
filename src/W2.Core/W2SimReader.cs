@@ -27,7 +27,7 @@ public sealed class W2SimReader : IReadingSource
 
     public bool IsRunning => _running;
 
-    public void Start(string portName)
+    public void Start(string portName, Func<string?>? resolvePort = null)
     {
         Stop();
         _running = true;

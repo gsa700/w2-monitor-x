@@ -96,6 +96,7 @@ public sealed class MeterService : IDisposable
             Status = msg;
             StatusIsError = isError;
             if (isError) IsConnected = false;
+            else if (msg.StartsWith("Connected")) IsConnected = true;  // restore on a (re)connect
             StateChanged?.Invoke(this);
         });
     }
@@ -108,8 +109,23 @@ public sealed class MeterService : IDisposable
         Status = $"Connecting {Port}…";
         StatusIsError = false;
         IsConnected = true;
-        _reader.Start(Port);
+        _reader.Start(Port, ResolveCurrentPort);
         StateChanged?.Invoke(this);
+    }
+
+    /// <summary>
+    /// Re-pin to the cable's current port on every (re)connect so a USB replug/renumber is followed
+    /// to whatever /dev/tty* (or COM) it now maps to. Falls back to the saved port when there's no
+    /// stable serial (e.g. no /dev/serial/by-id). Updates <see cref="Port"/> when it moves so Setup
+    /// and the saved config reflect reality.
+    /// </summary>
+    private string? ResolveCurrentPort()
+    {
+        if (IsSimulated) return Port;
+        var current = PortIdentity.ResolvePort(Port, Serial);
+        if (current is not null && current != Port)
+            Dispatcher.UIThread.Post(() => { Port = current; StateChanged?.Invoke(this); });
+        return current;
     }
 
     public void Disconnect()

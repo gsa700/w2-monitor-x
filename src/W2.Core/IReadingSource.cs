@@ -12,7 +12,12 @@ public interface IReadingSource : IDisposable
     event Action<string, bool>? StatusChanged;   // (message, isError)
 
     bool IsRunning { get; }
-    void Start(string portName);
+
+    /// <summary>
+    /// Start reading. <paramref name="resolvePort"/>, if given, is re-queried on every (re)connect
+    /// to follow a USB replug/renumber to the cable's current /dev/tty*; null keeps the fixed port.
+    /// </summary>
+    void Start(string portName, Func<string?>? resolvePort = null);
     void Stop();
 
     /// <summary>Queue a single W2 command char (e.g. 'N','Y','O','0','1','L') to send to the meter.</summary>

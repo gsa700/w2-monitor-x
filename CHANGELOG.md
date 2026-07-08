@@ -3,6 +3,28 @@
 Cross-platform **W2 Monitor** (.NET 8 + Avalonia). Companion to the original PowerShell
 app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
+## [0.3.3-beta] - 2026-07-07
+
+First fix from the Raspberry Pi / CM5 serial shakeout (see `HANDOFF-PI.md`). Validated on a
+live CM5 against a real FTDI cable, including a forced USB drop/renumber.
+
+### Fixed
+- **Auto-reconnect after a USB drop or renumber (Linux/Pi).** A W2 that dropped off the bus
+  (loose cable, power blip, or the FTDI re-enumerating to a new `/dev/ttyUSB*`) was lost until
+  the app restarted: the reader spun forever on the dead handle, leaking a `"(deleted)"` fd and
+  freezing the readout on its last value. The reader now **detects the loss** (a hard port error,
+  or a run of empty poll cycles via the new `LinkHealth`), **closes the port** so no fd leaks, and
+  **reconnects** — re-resolving `/dev/serial/by-id` every attempt so it follows the cable to
+  whatever port it now maps to. `IsConnected` is restored on reconnect so the W2 controls come
+  back live.
+- **Never wedge on a surprise-removed FTDI.** On Linux `SerialPort.Open()`/`Close()` can block
+  forever when the device vanished mid-call — this is what left the old reader stuck. Both are now
+  watchdog-bounded, so a dropped device can't stall the reconnect loop or `Stop()`/shutdown.
+
+### Added
+- `LinkHealth` (in `W2.Core`, unit-tested) — decides when a silent link is dead vs. a single
+  skipped reply, keeping reconnect decisions out of the serial plumbing.
+
 ## [0.3.2-beta] - 2026-07-05
 
 ### Added

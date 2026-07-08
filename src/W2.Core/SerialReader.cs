@@ -15,21 +15,33 @@ namespace W2.Core;
 /// mirroring the PowerShell app's per-meter runspaces but with plain background threads.
 /// Serial params and the query set come from W2App.ps1 (9600 8N1; DtrEnable/RtsEnable;
 /// per-cycle F/R/S/I queries).
+///
+/// Resilience: the poll runs under a supervisor that detects a dropped device (a hard port
+/// I/O error, or <see cref="LinkHealth"/> seeing a run of empty cycles), closes the port so the
+/// OS fd is released — never left dangling as "/dev/ttyUSB* (deleted)" — then backs off and
+/// reconnects. If a <c>resolvePort</c> delegate is supplied it is re-queried each attempt, so a
+/// USB replug/renumber is followed to whatever /dev/tty* the cable now maps to.
 /// </summary>
 public sealed class SerialReader : IReadingSource
 {
     private const int BaudRate = 9600;          // W2App.ps1:134
     private const int PollIntervalMs = 80;      // W2App.ps1:166
     private const int ReplyTimeoutMs = 200;     // W2App.ps1:135 (ReadTimeout)
+    private const int SettleMs = 120;           // W2App.ps1:136 — settle after open
+    private const int ReconnectDelayMs = 1000;  // backoff between reconnect attempts
+    private const int OpenTimeoutMs = 4000;     // cap a native Open() that wedges on a bad device
+    private const int CloseTimeoutMs = 1500;    // cap a native Close() that wedges on a removed device
 
     private static readonly Regex NEcho = new(@"[Nn]([AP])", RegexOptions.Compiled);
     private static readonly Regex YEcho = new(@"[Yy]([01])", RegexOptions.Compiled);
     private static readonly Regex FwdRf = new(@"[Ff](\d+)D(\d)", RegexOptions.Compiled);
 
     private readonly ConcurrentQueue<char> _cmds = new();
+    private readonly ManualResetEventSlim _stop = new(false);  // signalled by Stop(); also wakes backoff waits
     private SerialPort? _port;
     private Thread? _thread;
     private volatile bool _running;
+    private volatile bool _linkFaulted;   // set when a query hits a hard port error (device gone)
     private bool? _pep;
     private bool? _search;
 
@@ -42,14 +54,15 @@ public sealed class SerialReader : IReadingSource
 
     public void Send(char command) => _cmds.Enqueue(command);
 
-    public void Start(string portName)
+    public void Start(string portName, Func<string?>? resolvePort = null)
     {
         Stop();
         _pep = null;
         _search = null;
         while (_cmds.TryDequeue(out _)) { }
+        _stop.Reset();
         _running = true;
-        _thread = new Thread(() => Loop(portName))
+        _thread = new Thread(() => Supervise(portName, resolvePort))
         {
             IsBackground = true,
             Name = $"W2-{portName}",
@@ -60,16 +73,74 @@ public sealed class SerialReader : IReadingSource
     public void Stop()
     {
         _running = false;
-        try { _thread?.Join(500); } catch { /* ignore */ }
+        _stop.Set();                       // wake any backoff/poll wait immediately
+        try { _thread?.Join(3000); } catch { /* ignore */ }
         _thread = null;
         ClosePort();
     }
 
-    private void Loop(string portName)
+    /// <summary>
+    /// Run <paramref name="action"/> on a throwaway background thread and wait up to
+    /// <paramref name="timeoutMs"/>. Returns whether it finished and any exception it threw. This
+    /// is the guard around <c>SerialPort.Open()/Close()</c>, which on Linux can block forever when
+    /// the FTDI is surprise-removed — if it wedges we abandon that thread (it unblocks once the USB
+    /// stack finishes tearing the device down) and let the supervisor get on with reconnecting.
+    /// </summary>
+    private static (bool completed, Exception? error) Guard(Action action, int timeoutMs)
+    {
+        Exception? error = null;
+        var done = new ManualResetEventSlim(false);
+        new Thread(() =>
+        {
+            try { action(); }
+            catch (Exception ex) { error = ex; }
+            finally { done.Set(); }
+        })
+        { IsBackground = true, Name = "W2-io" }.Start();
+        return (done.Wait(timeoutMs), error);
+    }
+
+    /// <summary>
+    /// Outer loop: (re-)resolve the port, run one connected session, and — unless we were asked to
+    /// stop — back off and try again. Every session closes its port in a finally, so a dropped
+    /// device never leaks an fd, and a replug is picked up by re-querying <paramref name="resolvePort"/>.
+    /// </summary>
+    private void Supervise(string portName, Func<string?>? resolvePort)
     {
         try
         {
-            _port = new SerialPort(portName, BaudRate, Parity.None, 8, StopBits.One)
+            while (_running)
+            {
+                var port = SafeResolve(resolvePort) ?? portName;
+                RunSession(port);
+                if (!_running) break;
+                if (_stop.Wait(ReconnectDelayMs)) break;   // Stop() during backoff → exit
+            }
+        }
+        finally
+        {
+            ClosePort();
+            if (!_running) StatusChanged?.Invoke("Disconnected", false);
+        }
+    }
+
+    private static string? SafeResolve(Func<string?>? resolvePort)
+    {
+        try { return resolvePort?.Invoke(); } catch { return null; }
+    }
+
+    /// <summary>One connected session: open, poll until the link drops or we're stopped, then close.</summary>
+    private void RunSession(string portName)
+    {
+        _linkFaulted = false;
+        var health = new LinkHealth();
+
+        // Open under a watchdog: a healthy FTDI opens in well under a second, but a stale/removed
+        // node can block the native call — bound it so a bad port never stalls the reconnect loop.
+        SerialPort? port = null;
+        var (opened, openError) = Guard(() =>
+        {
+            port = new SerialPort(portName, BaudRate, Parity.None, 8, StopBits.One)
             {
                 Handshake = Handshake.None,
                 DtrEnable = true,
@@ -78,31 +149,54 @@ public sealed class SerialReader : IReadingSource
                 WriteTimeout = ReplyTimeoutMs,
                 Encoding = Encoding.ASCII,
             };
-            _port.Open();
-            Thread.Sleep(120);                 // W2App.ps1:136 — settle after open
-            _port.DiscardInBuffer();
+            port.Open();
+        }, OpenTimeoutMs);
+
+        if (!opened)
+        {
+            if (_running) StatusChanged?.Invoke($"{portName} not responding — retrying…", true);
+            return;   // abandon the wedged open thread; supervisor backs off and retries
+        }
+        if (openError is not null)
+        {
+            if (_running) StatusChanged?.Invoke(
+                SerialErrors.Describe(openError, portName, OperatingSystem.IsLinux()) + " Retrying…", true);
+            return;
+        }
+        if (port is null) return;   // completed without error but no port (shouldn't happen); retry
+        _port = port;
+
+        try
+        {
+            if (_stop.Wait(SettleMs)) return;  // stop requested while settling
+            try { port.DiscardInBuffer(); } catch { /* non-fatal */ }
             StatusChanged?.Invoke($"Connected on {portName}", false);
             ProbeToggleStates();
 
-            while (_running)
+            while (_running && !_linkFaulted && !health.IsLost)
             {
                 DrainCommands();
                 var f = Query('F');
                 var r = Query('R');
                 var s = Query('S');
                 var i = Query('I');
+                health.RecordCycle(f is not null || r is not null || s is not null || i is not null);
+                if (_linkFaulted) health.Fault();
                 ReadingReceived?.Invoke(W2FrameParser.Build(f, r, s, i) with { Pep = _pep, Search = _search });
-                Thread.Sleep(PollIntervalMs);
+                if (_stop.Wait(PollIntervalMs)) break;
             }
+
+            if (_running && (health.IsLost || _linkFaulted))
+                StatusChanged?.Invoke($"{portName} lost — reconnecting…", true);
         }
         catch (Exception ex) when (_running)
         {
-            StatusChanged?.Invoke(SerialErrors.Describe(ex, portName, OperatingSystem.IsLinux()), true);
+            StatusChanged?.Invoke(
+                SerialErrors.Describe(ex, portName, OperatingSystem.IsLinux()) + " Retrying…", true);
         }
         finally
         {
-            ClosePort();
-            if (!_running) StatusChanged?.Invoke("Disconnected", false);
+            ClosePort();   // always release the fd — a dropped device must not leave a dangling handle
         }
     }
 
@@ -138,20 +232,21 @@ public sealed class SerialReader : IReadingSource
     /// <summary>Write a single command char and read back one ';'-terminated reply.</summary>
     private string? Query(char cmd)
     {
-        if (_port is not { IsOpen: true }) return null;
+        var port = _port;   // snapshot: Stop()/ClosePort() may null the field concurrently
+        if (port is not { IsOpen: true }) return null;
         try
         {
-            _port.DiscardInBuffer();
-            _port.Write(cmd.ToString());
+            port.DiscardInBuffer();
+            port.Write(cmd.ToString());
             var framer = new ReplyFramer();
             var deadline = DateTime.UtcNow.AddMilliseconds(ReplyTimeoutMs);
             var buffer = new byte[256];
             while (DateTime.UtcNow < deadline)
             {
-                var avail = _port.BytesToRead;
+                var avail = port.BytesToRead;
                 if (avail > 0)
                 {
-                    var n = _port.Read(buffer, 0, Math.Min(avail, buffer.Length));
+                    var n = port.Read(buffer, 0, Math.Min(avail, buffer.Length));
                     var replies = framer.Feed(Encoding.ASCII.GetString(buffer, 0, n));
                     if (replies.Count > 0) return replies[0];
                 }
@@ -161,20 +256,34 @@ public sealed class SerialReader : IReadingSource
                 }
             }
         }
-        catch { /* timeout / transient read error -> null (held last-good upstream) */ }
+        catch (Exception ex)
+        {
+            // A hard port error (device unplugged / port closed) means the link is gone — flag it so
+            // the session tears down and reconnects. A plain timeout doesn't throw here (the loop just
+            // hits its deadline and returns null → held last-good upstream), so anything caught is fatal.
+            if (ex is IOException or ObjectDisposedException or InvalidOperationException or UnauthorizedAccessException)
+                _linkFaulted = true;
+        }
         return null;
     }
 
     private void ClosePort()
     {
-        try { if (_port is { IsOpen: true }) _port.Close(); }
-        catch { /* ignore */ }
-        finally
+        var port = Interlocked.Exchange(ref _port, null);   // one closer wins; Query sees null next
+        if (port is null) return;
+        // Close under a watchdog: on Linux a surprise-removed FTDI can make Close()/Dispose() block
+        // forever. If it wedges we abandon that thread (background — it unblocks once the device is
+        // fully gone) rather than let it freeze reconnect or Stop().
+        Guard(() =>
         {
-            _port?.Dispose();
-            _port = null;
-        }
+            try { if (port.IsOpen) port.Close(); } catch { /* ignore */ }
+            port.Dispose();
+        }, CloseTimeoutMs);
     }
 
-    public void Dispose() => Stop();
+    public void Dispose()
+    {
+        Stop();
+        _stop.Dispose();
+    }
 }
