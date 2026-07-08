@@ -10,9 +10,9 @@ Raspberry Pi**. Built with .NET 8 + Avalonia.
 
 ![W2 Monitor main window](docs/main.png)
 
-> **Beta:** in active use, not yet broadly field-tested. Windows is validated against live
-> hardware; Linux and Raspberry Pi builds run but are still being shaken out on real gear.
-> This is the cross-platform successor to the original (now retired) PowerShell
+> **Beta:** validated on real hardware across **Windows, Linux, and Raspberry Pi** (identical
+> behavior on each) — in active use, but not yet broadly field-tested across many stations. This
+> is the cross-platform successor to the original (now retired) PowerShell
 > [W2 Monitor](https://github.com/gsa700/w2-monitor).
 
 ## Features
@@ -64,7 +64,8 @@ Then click **Setup**, add your W2's port (or **Detect**), and **Connect**.
 - **Cable pinning:** on Linux the app pins each W2 by its stable `/dev/serial/by-id/*` name and
   follows it to whatever `/dev/tty*` it currently maps to — the non-Windows analog of the Windows
   FTDI chip-serial pinning, so a replug/renumber doesn't lose the meter.
-- **Raspberry Pi:** use the `linux-arm64` build (renderer is Avalonia/Skia).
+- **Raspberry Pi:** use the `linux-arm64` build (Avalonia/Skia renderer); validated on a Pi CM5.
+  The reader auto-reconnects and follows the cable by its `by-id` serial across USB drops/renumbers.
 
 ## Build from source
 

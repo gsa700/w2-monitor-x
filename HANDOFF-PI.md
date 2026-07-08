@@ -6,6 +6,12 @@ Windows-side session that built the port.
 
 **Read first:** `README.md`, `CHANGELOG.md`, `BACKLOG.md`, then this file.
 
+> **Status — RESOLVED (2026-07-07):** the serial shakeout below is done. Auto-reconnect /
+> follow-the-cable landed in **v0.3.3-beta**, and the app is now validated on real hardware
+> across Windows, Raspberry Pi CM5 (arm64), and Fedora (x64) — full test suite passing on each,
+> identical behavior. This doc is kept as a reference map of the serial subsystem and the CM5
+> gotchas for any future Linux serial work; the "mission" below is complete.
+
 ---
 
 ## The mission
