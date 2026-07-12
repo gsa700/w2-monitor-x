@@ -51,6 +51,9 @@ in-app updater:
 
 Then click **Setup**, add your W2's port (or **Detect**), and **Connect**.
 
+**Optional — add a desktop shortcut:** from the extracted folder, run
+**`Create Desktop Shortcut.vbs`** (Windows) or **`./install-desktop-shortcut.sh`** (Linux/Pi).
+
 ## Requirements
 
 - An **Elecraft W2** on a serial/USB (FTDI) port.

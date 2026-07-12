@@ -3,6 +3,15 @@
 Cross-platform **W2 Monitor** (.NET 8 + Avalonia). Companion to the original PowerShell
 app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
+## [0.3.4-beta] - 2026-07-07
+
+### Added
+- **Desktop-shortcut helper in each download**, brought over from the PowerShell version.
+  - **Windows:** run `Create Desktop Shortcut.vbs` to drop a "W2 Monitor" shortcut on the
+    Desktop (points at `W2Monitor.exe`, uses its embedded icon).
+  - **Linux/Pi:** run `./install-desktop-shortcut.sh` to add a "W2 Monitor" entry to your
+    applications menu (and Desktop), with a bundled icon and a `dialout` reminder.
+
 ## [0.3.3-beta] - 2026-07-07
 
 First fix from the Raspberry Pi / CM5 serial shakeout (see `HANDOFF-PI.md`). Validated on a
