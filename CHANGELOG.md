@@ -3,6 +3,23 @@
 Cross-platform **W2 Monitor** (.NET 8 + Avalonia). Companion to the original PowerShell
 app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
+## [0.3.5-beta] - 2026-07-12
+
+### Fixed
+- **Readout no longer flickers to a sampler catching stray RF.** In Search mode the W2 hops
+  between its two samplers; if the idle one caught a little stray RF, the display jumped between
+  the real over and the stray reading. It now **locks to the sampler carrying the over and
+  ignores the other** until that over ends. Applied per meter, so it holds independently across
+  multiple W2s. (With several W2s transmitting at once, the main display still shows the strongest
+  one — pin another in Setup to watch it.)
+
+### Changed
+- **Check-for-updates and Update-now merged into one button.** The separate "Update now" only
+  appeared after a check and was easy to miss. A single button now checks, then becomes
+  "Update now" once an update is found.
+- **Removed the bundled desktop-shortcut helpers.** They added launcher warnings/prompts on both
+  platforms. The README now explains how to make a shortcut with your OS's own tools instead.
+
 ## [0.3.4-beta] - 2026-07-07
 
 ### Added

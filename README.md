@@ -19,8 +19,13 @@ Raspberry Pi**. Built with .NET 8 + Avalonia.
 
 - **Live readout** — forward power, SWR (green/amber/red), reflected power, return loss, and a
   stacked power/SWR bar with a **peak-hold marker**.
-- **Multiple W2 meters at once** — each on its own background thread; the display auto-focuses
-  whichever meter is transmitting. **Detect** finds connected meters.
+- **Multiple W2 meters at once** — each on its own background thread; the main display
+  auto-focuses whichever meter is transmitting (the **strongest**, if several key at once —
+  the others keep tracking in the background; pin one in **Setup** to watch it). **Detect**
+  finds connected meters.
+- **Steady in Search mode** — when the W2 hunts between its two samplers, the readout locks to
+  the sampler carrying your over and ignores stray RF the meter picks up on the other. Applied
+  per meter, so it holds independently across multiple W2s.
 - **Full W2 control** from Setup (acts on the selected meter): Auto Sensor, Auto Range, Avg/PEP,
   Manual Sensor, Manual Range, LEDs — with live lamp states.
 - **TX-timeout timer** — solid yellow 30 s before timeout, flashing red at/after (silent).
