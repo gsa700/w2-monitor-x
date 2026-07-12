@@ -124,10 +124,8 @@ Also just inspect the environment directly: `ls -l /dev/serial/by-id/`, `ls /dev
 - **Version** lives in `src/W2.App/W2.App.csproj` (`<Version>`). Bump it + add a `CHANGELOG.md`
   entry per release. Versions < 1.0 are `-beta` ("in use, not broadly field-tested").
 - **Release recipe:** `dotnet test` → publish 3 RIDs self-contained single-file
-  (`win-x64`, `linux-x64`, `linux-arm64`) → **copy the packaging helper into each publish dir
-  before zipping** (win: `packaging/Create Desktop Shortcut.vbs`; linux: `packaging/
-  install-desktop-shortcut.sh` + `packaging/icon.png`) → zip each as `W2Monitor-<rid>.zip` →
-  commit → `git tag -a vX.Y.Z-beta` → `git push origin main --follow-tags` →
+  (`win-x64`, `linux-x64`, `linux-arm64`) → zip each as `W2Monitor-<rid>.zip` → commit →
+  `git tag -a vX.Y.Z-beta` → `git push origin main --follow-tags` →
   `gh release create vX.Y.Z-beta <zips> --title … --latest`. **Use `--latest`, NOT
   `--prerelease`** — the in-app updater queries `/releases/latest`, which skips pre-releases.
 - `gh` is authed as **gsa700**; repo is **gsa700/w2-monitor-x**; the updater slug matches.

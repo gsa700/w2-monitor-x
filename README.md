@@ -51,8 +51,11 @@ in-app updater:
 
 Then click **Setup**, add your W2's port (or **Detect**), and **Connect**.
 
-**Optional — add a desktop shortcut:** from the extracted folder, run
-**`Create Desktop Shortcut.vbs`** (Windows) or **`./install-desktop-shortcut.sh`** (Linux/Pi).
+**Want a desktop shortcut?** Make one with your OS's own tools:
+- **Windows:** right-click `W2Monitor.exe` → **Show more options** → **Send to** →
+  **Desktop (create shortcut)**.
+- **Linux:** use your desktop's "create launcher / add to favorites" option, or hand-write a
+  `.desktop` entry pointing `Exec=` at the `W2Monitor` binary.
 
 ## Requirements
 
