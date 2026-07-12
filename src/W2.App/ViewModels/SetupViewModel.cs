@@ -41,8 +41,7 @@ public sealed class SetupViewModel : ViewModelBase
         LedsCommand = new RelayCommand(() => SelectedRow?.Meter.ToggleLeds(), () => CanControl);
         ResetPeakCommand = new RelayCommand(() => _manager.Focus?.ResetPeak());
 
-        CheckUpdatesCommand = new RelayCommand(() => _ = CheckUpdatesAsync(), () => !_updateBusy);
-        UpdateNowCommand = new RelayCommand(() => _ = UpdateNowAsync(), () => _updateInfo?.AssetUrl is not null && !_updateBusy);
+        UpdateCommand = new RelayCommand(() => _ = UpdateButtonAsync(), () => !_updateBusy);
         OpenReleaseCommand = new RelayCommand(OpenRelease);
         UpdateStatus = $"You have {UpdateService.CurrentVersion}.";
 
@@ -68,8 +67,7 @@ public sealed class SetupViewModel : ViewModelBase
     public RelayCommand RangeCommand { get; }
     public RelayCommand LedsCommand { get; }
     public RelayCommand ResetPeakCommand { get; }
-    public RelayCommand CheckUpdatesCommand { get; }
-    public RelayCommand UpdateNowCommand { get; }
+    public RelayCommand UpdateCommand { get; }
     public RelayCommand OpenReleaseCommand { get; }
 
     // W2 control lamp state (reflects the selected meter).
@@ -233,11 +231,20 @@ public sealed class SetupViewModel : ViewModelBase
     public IBrush UpdateStatusBrush { get => _updateStatusBrush; private set => SetProperty(ref _updateStatusBrush, value); }
 
     private bool _updateAvailable;
-    public bool UpdateAvailable { get => _updateAvailable; private set => SetProperty(ref _updateAvailable, value); }
+    public bool UpdateAvailable
+    {
+        get => _updateAvailable;
+        private set { if (SetProperty(ref _updateAvailable, value)) OnPropertyChanged(nameof(UpdateButtonLabel)); }
+    }
+
+    /// <summary>One button does both: check first, then (once an update is found) install.</summary>
+    public string UpdateButtonLabel => UpdateAvailable ? "Update now" : "Check for updates";
+
+    private Task UpdateButtonAsync() => UpdateAvailable ? UpdateNowAsync() : CheckUpdatesAsync();
 
     public async Task CheckUpdatesAsync()
     {
-        _updateBusy = true; CheckUpdatesCommand.RaiseCanExecuteChanged(); UpdateNowCommand.RaiseCanExecuteChanged();
+        _updateBusy = true; UpdateCommand.RaiseCanExecuteChanged();
         UpdateStatus = "Checking for updates…"; UpdateStatusBrush = Palette.DimBrush;
 
         var info = await UpdateService.CheckAsync();
@@ -259,13 +266,13 @@ public sealed class SetupViewModel : ViewModelBase
             UpdateStatus = $"Up to date ({info.CurrentVersion})."; UpdateStatusBrush = Palette.GreenBrush; UpdateAvailable = false;
         }
 
-        _updateBusy = false; CheckUpdatesCommand.RaiseCanExecuteChanged(); UpdateNowCommand.RaiseCanExecuteChanged();
+        _updateBusy = false; UpdateCommand.RaiseCanExecuteChanged();
     }
 
     private async Task UpdateNowAsync()
     {
         if (_updateInfo?.AssetUrl is not { } url) return;
-        _updateBusy = true; UpdateNowCommand.RaiseCanExecuteChanged(); CheckUpdatesCommand.RaiseCanExecuteChanged();
+        _updateBusy = true; UpdateCommand.RaiseCanExecuteChanged();
         try
         {
             UpdateStatus = "Downloading update…"; UpdateStatusBrush = Palette.DimBrush;
@@ -277,7 +284,7 @@ public sealed class SetupViewModel : ViewModelBase
         catch (Exception ex)
         {
             UpdateStatus = $"Update failed: {ex.Message}"; UpdateStatusBrush = Palette.RedBrush;
-            _updateBusy = false; UpdateNowCommand.RaiseCanExecuteChanged(); CheckUpdatesCommand.RaiseCanExecuteChanged();
+            _updateBusy = false; UpdateCommand.RaiseCanExecuteChanged();
         }
     }
 

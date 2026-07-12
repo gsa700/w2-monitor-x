@@ -92,10 +92,9 @@
     <!-- Updates -->
     <TextBlock Text="UPDATES" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}" Margin="0,4,0,0"/>
     <TextBlock Text="{Binding UpdateStatus}" Foreground="{Binding UpdateStatusBrush}" TextWrapping="Wrap"/>
-    <Grid ColumnDefinitions="Auto,Auto,Auto,*">
-      <Button Grid.Column="0" Content="Check for updates" Command="{Binding CheckUpdatesCommand}"/>
-      <Button Grid.Column="1" Content="Update now" Command="{Binding UpdateNowCommand}" IsVisible="{Binding UpdateAvailable}" Margin="6,0,0,0"/>
-      <Button Grid.Column="2" Content="Release page" Command="{Binding OpenReleaseCommand}" Margin="6,0,0,0"/>
+    <Grid ColumnDefinitions="Auto,Auto,*">
+      <Button Grid.Column="0" Content="{Binding UpdateButtonLabel}" Command="{Binding UpdateCommand}" MinWidth="140"/>
+      <Button Grid.Column="1" Content="Release page" Command="{Binding OpenReleaseCommand}" Margin="6,0,0,0"/>
     </Grid>
     <CheckBox Content="Check for updates at startup" IsChecked="{Binding CheckUpdatesAtStartup, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
 
