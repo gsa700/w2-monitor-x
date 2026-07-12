@@ -32,7 +32,8 @@ Categories=Utility;HamRadio;
 EOF
 chmod +x "$entry"
 
-# Drop a copy on the Desktop too, if there is one (GNOME wants it marked trusted).
+# Also drop a copy on the Desktop, if there is one. GNOME/Nautilus needs it marked "trusted";
+# some file managers (e.g. the Pi's PCManFM) still prompt once per launch — see the note below.
 if [ -d "$HOME/Desktop" ]; then
   cp "$entry" "$HOME/Desktop/w2monitor.desktop"
   chmod +x "$HOME/Desktop/w2monitor.desktop" 2>/dev/null || true
@@ -40,6 +41,15 @@ if [ -d "$HOME/Desktop" ]; then
 fi
 
 update-desktop-database "$apps" 2>/dev/null || true
+
 echo "Installed 'W2 Monitor' to your applications menu."
-echo "Reminder: add yourself to the 'dialout' group for serial access:"
+echo
+echo "Best: launch it from the Applications menu — that never prompts."
+echo "If the DESKTOP icon asks 'Execute / Execute in Terminal / Open …', that's your file"
+echo "manager's safety prompt for launcher files. Choose 'Execute', or silence it once:"
+echo "  * PCManFM (Raspberry Pi):  Edit -> Preferences -> General ->"
+echo "        tick 'Don't ask options on launch executable file'."
+echo "  * GNOME Files:  right-click the icon -> 'Allow Launching'."
+echo
+echo "Serial access needs the 'dialout' group:"
 echo "  sudo usermod -aG dialout \$USER   (then log out and back in)"
