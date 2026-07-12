@@ -14,6 +14,7 @@ public sealed class MeterService : IDisposable
     private const double TxHangSeconds = 2.0;
 
     private readonly IReadingSource _reader;
+    private readonly SensorLock _sensorLock = new();
 
     // TX tracking (per meter, so the manager can pick who's transmitting).
     private DateTime _txStart;
@@ -85,6 +86,9 @@ public sealed class MeterService : IDisposable
 
         _reader.ReadingReceived += r => Dispatcher.UIThread.Post(() =>
         {
+            // While a sampler is carrying the over, ignore frames the W2 hunts to on the other
+            // sampler (e.g. stray RF) so the readout doesn't flicker between them.
+            if (!_sensorLock.Accept(r.ActiveSampler, r.ForwardPowerW)) return;
             Current = r;
             TrackTx(r);
             TrackStatus(r);
@@ -106,6 +110,7 @@ public sealed class MeterService : IDisposable
     public void Connect()
     {
         if (Port is null) return;
+        _sensorLock.Reset();
         Status = $"Connecting {Port}…";
         StatusIsError = false;
         IsConnected = true;
@@ -131,6 +136,7 @@ public sealed class MeterService : IDisposable
     public void Disconnect()
     {
         _reader.Stop();
+        _sensorLock.Reset();
         IsConnected = false;
         IsTransmitting = false;
         Current = null;
