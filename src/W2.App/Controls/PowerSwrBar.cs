@@ -7,7 +7,7 @@ namespace W2.App.Controls;
 
 /// <summary>
 /// The W2's signature readout: a full-width forward-power bar with a thin cyan peak-hold marker
-/// riding on it, and a thinner SWR strip below. The SWR strip is coloured green→orange→red across
+/// riding on it, and a matching (same-height, square) SWR bar below. The SWR bar is coloured green→orange→red across
 /// the 1–3 scale; when the meter's alarm trip point is known, red is anchored at the trip (so the
 /// bar "goes red where your alarm goes off"). On a live SWR alarm the strip flashes red. Custom-
 /// drawn (the SmithChartControl pattern from LP-100A); either bar can be hidden.
@@ -15,7 +15,7 @@ namespace W2.App.Controls;
 public sealed class PowerSwrBar : Control
 {
     private const double PowerHeight = 16;
-    private const double SwrHeight = 8;
+    private const double SwrHeight = 16;   // match the power bar
     private const double Gap = 3;
     private const double MarkerWidth = 3;
     private const double SwrMin = 1.0;
@@ -106,11 +106,11 @@ public sealed class PowerSwrBar : Control
 
         if (ShowPowerBar)
         {
-            ctx.FillRectangle(Palette.TrackBrush, new Rect(0, y, w, PowerHeight), 2);
+            ctx.FillRectangle(Palette.TrackBrush, new Rect(0, y, w, PowerHeight));
 
             var frac = Fraction(Value, Max);
             if (frac > 0)
-                ctx.FillRectangle(Fill ?? Palette.BlueBrush, new Rect(0, y, w * frac, PowerHeight), 2);
+                ctx.FillRectangle(Fill ?? Palette.BlueBrush, new Rect(0, y, w * frac, PowerHeight));
 
             var pk = Fraction(HeldPeak, Max);
             if (pk > 0)
@@ -131,11 +131,11 @@ public sealed class PowerSwrBar : Control
 
         if (Alarm)
         {
-            ctx.FillRectangle(_flashOn ? AlarmBright : AlarmDim, strip, 2);
+            ctx.FillRectangle(_flashOn ? AlarmBright : AlarmDim, strip);
             return;
         }
 
-        ctx.FillRectangle(Palette.TrackBrush, strip, 2);
+        ctx.FillRectangle(Palette.TrackBrush, strip);
 
         var frac = Fraction(Swr - SwrMin, SwrMax - SwrMin);
         if (frac <= 0) return;
@@ -147,7 +147,7 @@ public sealed class PowerSwrBar : Control
             EndPoint = new RelativePoint(w, 0, RelativeUnit.Absolute),
         };
         AddSwrStops(brush.GradientStops);
-        ctx.FillRectangle(brush, new Rect(0, y, w * frac, SwrHeight), 2);
+        ctx.FillRectangle(brush, new Rect(0, y, w * frac, SwrHeight));
     }
 
     private void AddSwrStops(GradientStops stops)
