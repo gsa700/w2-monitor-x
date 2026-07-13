@@ -32,7 +32,6 @@ public sealed class SetupViewModel : ViewModelBase
         DisconnectAllCommand = new RelayCommand(() => _manager.DisconnectAll());
         RefreshCommand = new RelayCommand(RefreshPorts);
         DetectCommand = new RelayCommand(() => _ = DetectAsync(), () => !_manager.IsSimulated);
-        OpenWindowCommand = new RelayCommand(OpenWindow, () => SelectedRow is not null);
 
         SearchCommand = new RelayCommand(() => SelectedRow?.Meter.ToggleSearch(), () => CanControl);
         AutoRangeCommand = new RelayCommand(() => SelectedRow?.Meter.ToggleAutoRange(), () => CanControl);
@@ -61,16 +60,10 @@ public sealed class SetupViewModel : ViewModelBase
     public RelayCommand DisconnectAllCommand { get; }
     public RelayCommand RefreshCommand { get; }
     public RelayCommand DetectCommand { get; }
-    public RelayCommand OpenWindowCommand { get; }
     public RelayCommand SearchCommand { get; }
 
-    /// <summary>Dedicated per-meter windows only make sense with more than one meter.</summary>
+    /// <summary>The one-window-per-meter option only makes sense with more than one meter.</summary>
     public bool MultipleMeters => _manager.Meters.Count > 1;
-
-    private void OpenWindow()
-    {
-        if (SelectedRow is { } row) (Application.Current as App)?.OpenMeterWindow(row.Meter);
-    }
     public RelayCommand AutoRangeCommand { get; }
     public RelayCommand AvgPepCommand { get; }
     public RelayCommand SensorCommand { get; }
@@ -128,7 +121,6 @@ public sealed class SetupViewModel : ViewModelBase
 
             RemoveCommand.RaiseCanExecuteChanged();
             ToggleConnectCommand.RaiseCanExecuteChanged();
-            OpenWindowCommand.RaiseCanExecuteChanged();
             OnPropertyChanged(nameof(ToggleConnectLabel));
             RefreshControls();
         }
@@ -225,7 +217,6 @@ public sealed class SetupViewModel : ViewModelBase
         OnPropertyChanged(nameof(ToggleConnectLabel));
         OnPropertyChanged(nameof(MultipleMeters));
         ToggleConnectCommand.RaiseCanExecuteChanged();
-        OpenWindowCommand.RaiseCanExecuteChanged();
         RefreshControls();
     }
 

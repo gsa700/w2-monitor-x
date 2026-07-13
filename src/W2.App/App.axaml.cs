@@ -19,8 +19,9 @@ public partial class App : Application
     private MeterManager _manager = null!;
     private SetupViewModel _setupVm = null!;
 
-    private MainWindow? _focusWindow;                              // the auto-focus window (optional)
-    private readonly Dictionary<string, MainWindow> _meterWindows = new();   // dedicated per-meter windows
+    // Window mode: either one auto-focus window, or a dedicated window per meter.
+    private MainWindow? _focusWindow;
+    private readonly Dictionary<string, MainWindow> _meterWindows = new();
     private SetupWindow? _setupWindow;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
@@ -42,19 +43,16 @@ public partial class App : Application
             if (simulated) BuildSimMeters();
             else RestoreMeters();
 
-            // Build the startup window set: the focus window (unless the user closed it last time)
-            // plus any dedicated per-meter windows that were open. Always at least one window.
-            var windows = new List<MainWindow>();
-            if (_config.FocusWindowOpen) windows.Add(CreateFocusWindow());
-            if (!simulated)
-                foreach (var m in _manager.Meters)
-                    if (ConfigFor(m.Id).WinOpen) windows.Add(CreateMeterWindow(m));
-            if (windows.Count == 0) windows.Add(CreateFocusWindow());   // guard: never start windowless
+            // Per-meter mode → one window per meter; otherwise the single auto-focus window.
+            List<MainWindow> windows = PerMeter
+                ? _manager.Meters.Select(CreateMeterWindow).ToList()
+                : new List<MainWindow> { CreateFocusWindow() };
 
             desktop.MainWindow = windows[0];
             desktop.ShutdownMode = ShutdownMode.OnLastWindowClose;
 
             _display.PropertyChanged += OnDisplayChanged;
+            _manager.MetersChanged += OnMetersChanged;
             desktop.Exit += (_, _) => { SaveConfig(); _manager.Dispose(); };
 
             var openSetup = Environment.GetCommandLineArgs()
@@ -73,6 +71,9 @@ public partial class App : Application
 
         base.OnFrameworkInitializationCompleted();
     }
+
+    /// <summary>True when per-meter window mode should be active (needs at least one meter).</summary>
+    private bool PerMeter => _display.PerMeterWindows && _manager.Meters.Count > 0;
 
     private void BuildSimMeters()
     {
@@ -98,13 +99,12 @@ public partial class App : Application
         }
     }
 
-    // --- window factories ---
+    // --- window mode ---
 
     private MainWindow CreateFocusWindow()
     {
         var w = new MainWindow { DataContext = new MainWindowViewModel(_manager, _display), Topmost = _display.AlwaysOnTop };
         RestoreBounds(w, _config.X, _config.Y);
-        _config.FocusWindowOpen = true;
         _focusWindow = w;
         return w;
     }
@@ -113,17 +113,36 @@ public partial class App : Application
     {
         var w = new MainWindow { DataContext = new MainWindowViewModel(m, _display), Topmost = _display.AlwaysOnTop };
         if (_manager.IsSimulated) RestoreBounds(w, null, null);
-        else { var c = ConfigFor(m.Id); c.WinOpen = true; RestoreBounds(w, c.WinX, c.WinY); }
+        else { var c = ConfigFor(m.Id); RestoreBounds(w, c.WinX, c.WinY); }
         _meterWindows[m.Id] = w;
         return w;
     }
 
-    /// <summary>Open (or focus) a dedicated window for a meter — from Setup's "Open window".</summary>
-    public void OpenMeterWindow(MeterService m)
+    /// <summary>Reconcile the open windows to the current mode. Opens the new set before closing the
+    /// old, so we never momentarily have zero windows (which would exit the app).</summary>
+    private void ApplyWindowMode()
     {
-        if (_meterWindows.TryGetValue(m.Id, out var existing)) { existing.Activate(); return; }
-        CreateMeterWindow(m).Show();
-        SaveConfig();
+        if (PerMeter)
+        {
+            foreach (var m in _manager.Meters)
+                if (!_meterWindows.ContainsKey(m.Id)) CreateMeterWindow(m).Show();
+            _focusWindow?.Close();
+        }
+        else
+        {
+            if (_focusWindow is null) CreateFocusWindow().Show();
+            foreach (var w in _meterWindows.Values.ToList()) w.Close();
+        }
+    }
+
+    private void OnMetersChanged()
+    {
+        // In per-meter mode, follow the meter list: add a window for a new meter, drop one for a removed meter.
+        if (!PerMeter) return;
+        foreach (var m in _manager.Meters)
+            if (!_meterWindows.ContainsKey(m.Id)) CreateMeterWindow(m).Show();
+        foreach (var id in _meterWindows.Keys.Where(id => _manager.Meters.All(m => m.Id != id)).ToList())
+            _meterWindows[id].Close();
     }
 
     public void NotifyMainWindowClosing(MainWindow w)
@@ -132,7 +151,6 @@ public partial class App : Application
         {
             _config.X = w.Position.X;
             _config.Y = w.Position.Y;
-            _config.FocusWindowOpen = false;
             _focusWindow = null;
         }
         else
@@ -140,7 +158,7 @@ public partial class App : Application
             var id = _meterWindows.FirstOrDefault(kv => ReferenceEquals(kv.Value, w)).Key;
             if (id is not null)
             {
-                if (!_manager.IsSimulated) { var c = ConfigFor(id); c.WinX = w.Position.X; c.WinY = w.Position.Y; c.WinOpen = false; }
+                if (!_manager.IsSimulated) { var c = ConfigFor(id); c.WinX = w.Position.X; c.WinY = w.Position.Y; }
                 _meterWindows.Remove(id);
             }
         }
@@ -194,8 +212,15 @@ public partial class App : Application
 
     private void OnDisplayChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(DisplaySettings.AlwaysOnTop))
-            foreach (var w in AllWindows()) w.Topmost = _display.AlwaysOnTop;
+        switch (e.PropertyName)
+        {
+            case nameof(DisplaySettings.AlwaysOnTop):
+                foreach (var w in AllWindows()) w.Topmost = _display.AlwaysOnTop;
+                break;
+            case nameof(DisplaySettings.PerMeterWindows):
+                ApplyWindowMode();
+                break;
+        }
     }
 
     // --- config ---
@@ -229,7 +254,7 @@ public partial class App : Application
 
             if (!_manager.IsSimulated)
             {
-                foreach (var (id, w) in _meterWindows) { var c = ConfigFor(id); c.WinX = w.Position.X; c.WinY = w.Position.Y; c.WinOpen = true; }
+                foreach (var (id, w) in _meterWindows) { var c = ConfigFor(id); c.WinX = w.Position.X; c.WinY = w.Position.Y; }
                 SyncMeterConfig();
             }
 
@@ -240,7 +265,7 @@ public partial class App : Application
         catch { /* best effort */ }
     }
 
-    /// <summary>Update meter identity in config (add/update/remove) while preserving window state.</summary>
+    /// <summary>Update meter identity in config (add/update/remove) while preserving window bounds.</summary>
     private void SyncMeterConfig()
     {
         _config.Meters.RemoveAll(c => _manager.Meters.All(m => m.Id != c.Id));

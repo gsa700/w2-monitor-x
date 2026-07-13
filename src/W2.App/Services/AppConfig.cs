@@ -13,7 +13,6 @@ public sealed class AppConfig
 
     public List<MeterConfig> Meters { get; set; } = new();
     public bool CheckUpdatesAtStartup { get; set; }
-    public bool FocusWindowOpen { get; set; } = true;   // the auto-focus main window (default on)
     public DisplayConfig Display { get; set; } = new();
 
     // --- legacy single-meter fields (Phase 2 config); migrated on load ---
@@ -31,6 +30,7 @@ public sealed class AppConfig
         d.ShowTx = Display.ShowTx;
         d.TimeoutSec = Display.TimeoutSec;
         d.AlwaysOnTop = Display.AlwaysOnTop;
+        d.PerMeterWindows = Display.PerMeterWindows;
     }
 
     public void CaptureFrom(DisplaySettings d)
@@ -44,6 +44,7 @@ public sealed class AppConfig
         Display.ShowTx = d.ShowTx;
         Display.TimeoutSec = d.TimeoutSec;
         Display.AlwaysOnTop = d.AlwaysOnTop;
+        Display.PerMeterWindows = d.PerMeterWindows;
     }
 
     /// <summary>Fold a pre-multi-meter config (single Port/Serial) into the Meters list.</summary>
@@ -65,10 +66,9 @@ public sealed class MeterConfig
     public string? Port { get; set; }
     public string? Serial { get; set; }
 
-    // Dedicated per-meter window: last position and whether it was open at exit (for restore).
+    // Remembered position of this meter's dedicated window (used in per-meter window mode).
     public double? WinX { get; set; }
     public double? WinY { get; set; }
-    public bool WinOpen { get; set; }
 }
 
 /// <summary>Plain (serializable) mirror of <see cref="DisplaySettings"/>.</summary>
@@ -83,6 +83,7 @@ public sealed class DisplayConfig
     public bool ShowTx { get; set; } = true;
     public int TimeoutSec { get; set; } = 180;
     public bool AlwaysOnTop { get; set; }
+    public bool PerMeterWindows { get; set; }
 }
 
 public static class ConfigStore

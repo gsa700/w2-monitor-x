@@ -35,4 +35,8 @@ public sealed class DisplaySettings : ViewModelBase
 
     private bool _alwaysOnTop;
     public bool AlwaysOnTop { get => _alwaysOnTop; set => SetProperty(ref _alwaysOnTop, value); }
+
+    // Window mode: false = one auto-focus window; true = a dedicated window per meter.
+    private bool _perMeterWindows;
+    public bool PerMeterWindows { get => _perMeterWindows; set => SetProperty(ref _perMeterWindows, value); }
 }
