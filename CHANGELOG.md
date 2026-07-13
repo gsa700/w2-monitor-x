@@ -3,6 +3,16 @@
 Cross-platform **W2 Monitor** (.NET 8 + Avalonia). Companion to the original PowerShell
 app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
+## [0.3.6-beta] - 2026-07-12
+
+### Added
+- **Dedicated per-meter windows.** With more than one W2 connected, open a dedicated window for
+  any meter (**Setup → "Open a dedicated window for the selected meter"**) — each pinned to its
+  meter and named in the title bar. A multi-meter station can lay them out side-by-side instead
+  of squinting at one auto-focus readout; close the auto-focus window and keep just the dedicated
+  ones if you like. Your window layout (which are open, and where) is remembered between sessions.
+  Single-meter use is unchanged.
+
 ## [0.3.5-beta] - 2026-07-12
 
 ### Fixed
