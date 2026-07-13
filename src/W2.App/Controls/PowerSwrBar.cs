@@ -1,14 +1,16 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using Avalonia.Threading;
 
 namespace W2.App.Controls;
 
 /// <summary>
 /// The W2's signature readout: a full-width forward-power bar with a thin cyan peak-hold marker
-/// riding on it, and a thinner SWR strip below. Custom-drawn (the SmithChartControl pattern from
-/// LP-100A) so the peak marker and stacked layout aren't awkward ProgressBar hacks. Either bar
-/// can be hidden; the control sizes to whatever is shown.
+/// riding on it, and a thinner SWR strip below. The SWR strip is coloured green→orange→red across
+/// the 1–3 scale; when the meter's alarm trip point is known, red is anchored at the trip (so the
+/// bar "goes red where your alarm goes off"). On a live SWR alarm the strip flashes red. Custom-
+/// drawn (the SmithChartControl pattern from LP-100A); either bar can be hidden.
 /// </summary>
 public sealed class PowerSwrBar : Control
 {
@@ -16,6 +18,14 @@ public sealed class PowerSwrBar : Control
     private const double SwrHeight = 8;
     private const double Gap = 3;
     private const double MarkerWidth = 3;
+    private const double SwrMin = 1.0;
+    private const double SwrMax = 3.0;
+
+    private static readonly Color LowColor = Color.Parse("#3CC850");
+    private static readonly Color MidColor = Color.Parse("#FF8C00");
+    private static readonly Color HighColor = Color.Parse("#E64C4C");
+    private static readonly IBrush AlarmBright = new SolidColorBrush(HighColor);
+    private static readonly IBrush AlarmDim = new SolidColorBrush(Color.Parse("#3A1414"));
 
     public static readonly StyledProperty<double> ValueProperty =
         AvaloniaProperty.Register<PowerSwrBar, double>(nameof(Value));
@@ -25,6 +35,10 @@ public sealed class PowerSwrBar : Control
         AvaloniaProperty.Register<PowerSwrBar, double>(nameof(HeldPeak));
     public static readonly StyledProperty<double> SwrProperty =
         AvaloniaProperty.Register<PowerSwrBar, double>(nameof(Swr), 1.0);
+    public static readonly StyledProperty<double> AlarmTripProperty =
+        AvaloniaProperty.Register<PowerSwrBar, double>(nameof(AlarmTrip));   // 0 = unknown → fixed gradient
+    public static readonly StyledProperty<bool> AlarmProperty =
+        AvaloniaProperty.Register<PowerSwrBar, bool>(nameof(Alarm));
     public static readonly StyledProperty<bool> ShowPowerBarProperty =
         AvaloniaProperty.Register<PowerSwrBar, bool>(nameof(ShowPowerBar), true);
     public static readonly StyledProperty<bool> ShowSwrBarProperty =
@@ -37,17 +51,43 @@ public sealed class PowerSwrBar : Control
     static PowerSwrBar()
     {
         AffectsRender<PowerSwrBar>(ValueProperty, MaxProperty, HeldPeakProperty, SwrProperty,
-            ShowPowerBarProperty, ShowSwrBarProperty, FillProperty);
+            AlarmTripProperty, AlarmProperty, ShowPowerBarProperty, ShowSwrBarProperty, FillProperty);
         AffectsMeasure<PowerSwrBar>(ShowPowerBarProperty, ShowSwrBarProperty);
+    }
+
+    private readonly DispatcherTimer _flashTimer;
+    private bool _flashOn = true;
+
+    public PowerSwrBar()
+    {
+        _flashTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(380) };
+        _flashTimer.Tick += (_, _) => { _flashOn = !_flashOn; InvalidateVisual(); };
     }
 
     public double Value { get => GetValue(ValueProperty); set => SetValue(ValueProperty, value); }
     public double Max { get => GetValue(MaxProperty); set => SetValue(MaxProperty, value); }
     public double HeldPeak { get => GetValue(HeldPeakProperty); set => SetValue(HeldPeakProperty, value); }
     public double Swr { get => GetValue(SwrProperty); set => SetValue(SwrProperty, value); }
+    public double AlarmTrip { get => GetValue(AlarmTripProperty); set => SetValue(AlarmTripProperty, value); }
+    public bool Alarm { get => GetValue(AlarmProperty); set => SetValue(AlarmProperty, value); }
     public bool ShowPowerBar { get => GetValue(ShowPowerBarProperty); set => SetValue(ShowPowerBarProperty, value); }
     public bool ShowSwrBar { get => GetValue(ShowSwrBarProperty); set => SetValue(ShowSwrBarProperty, value); }
     public IBrush Fill { get => GetValue(FillProperty); set => SetValue(FillProperty, value); }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == AlarmProperty)
+        {
+            if (Alarm) { _flashOn = true; _flashTimer.Start(); } else _flashTimer.Stop();
+        }
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        _flashTimer.Stop();
+        base.OnDetachedFromVisualTree(e);
+    }
 
     protected override Size MeasureOverride(Size availableSize)
     {
@@ -66,14 +106,12 @@ public sealed class PowerSwrBar : Control
 
         if (ShowPowerBar)
         {
-            var track = new Rect(0, y, w, PowerHeight);
-            ctx.FillRectangle(Palette.TrackBrush, track, 2);
+            ctx.FillRectangle(Palette.TrackBrush, new Rect(0, y, w, PowerHeight), 2);
 
             var frac = Fraction(Value, Max);
             if (frac > 0)
                 ctx.FillRectangle(Fill ?? Palette.BlueBrush, new Rect(0, y, w * frac, PowerHeight), 2);
 
-            // Peak-hold marker: a thin cyan bar at the held-peak position.
             var pk = Fraction(HeldPeak, Max);
             if (pk > 0)
             {
@@ -84,14 +122,55 @@ public sealed class PowerSwrBar : Control
         }
 
         if (ShowSwrBar)
-        {
-            var track = new Rect(0, y, w, SwrHeight);
-            ctx.FillRectangle(Palette.TrackBrush, track, 2);
+            RenderSwr(ctx, w, y);
+    }
 
-            // SWR 1..3 mapped across the bar.
-            var frac = Fraction(Swr - 1.0, 2.0);
-            if (frac > 0)
-                ctx.FillRectangle(Palette.GoldBrush, new Rect(0, y, w * frac, SwrHeight), 2);
+    private void RenderSwr(DrawingContext ctx, double w, double y)
+    {
+        var strip = new Rect(0, y, w, SwrHeight);
+
+        if (Alarm)
+        {
+            ctx.FillRectangle(_flashOn ? AlarmBright : AlarmDim, strip, 2);
+            return;
+        }
+
+        ctx.FillRectangle(Palette.TrackBrush, strip, 2);
+
+        var frac = Fraction(Swr - SwrMin, SwrMax - SwrMin);
+        if (frac <= 0) return;
+
+        // Green→orange→red gradient sampled by the fill's leading edge, anchored at the trip point.
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = new RelativePoint(0, 0, RelativeUnit.Absolute),
+            EndPoint = new RelativePoint(w, 0, RelativeUnit.Absolute),
+        };
+        AddSwrStops(brush.GradientStops);
+        ctx.FillRectangle(brush, new Rect(0, y, w * frac, SwrHeight), 2);
+    }
+
+    private void AddSwrStops(GradientStops stops)
+    {
+        const double span = SwrMax - SwrMin;
+        double Frac(double swr) => Math.Clamp((swr - SwrMin) / span, 0, 1);
+
+        var trip = AlarmTrip;
+        if (trip > SwrMin && trip <= SwrMax)
+        {
+            // Red anchored where the meter's alarm trips; orange approaching; green safely below.
+            stops.Add(new GradientStop(LowColor, 0.0));
+            stops.Add(new GradientStop(LowColor, Frac(SwrMin + 0.50 * (trip - SwrMin))));
+            stops.Add(new GradientStop(MidColor, Frac(SwrMin + 0.82 * (trip - SwrMin))));
+            stops.Add(new GradientStop(HighColor, Frac(trip)));
+            stops.Add(new GradientStop(HighColor, 1.0));
+        }
+        else
+        {
+            stops.Add(new GradientStop(LowColor, 0.0));
+            stops.Add(new GradientStop(LowColor, 0.28));   // green through ~SWR 1.5
+            stops.Add(new GradientStop(MidColor, 0.55));   // orange around SWR 2.0
+            stops.Add(new GradientStop(HighColor, 1.0));   // red toward SWR 3.0
         }
     }
 

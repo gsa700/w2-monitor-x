@@ -44,6 +44,7 @@
     <ctl:PowerSwrBar Grid.Row="3" Margin="0,10,0,0" HorizontalAlignment="Stretch"
                      Value="{Binding PowerBarValue}" Max="{Binding PowerBarMax}"
                      HeldPeak="{Binding HeldPeakValue}" Swr="{Binding SwrBarValue}"
+                     AlarmTrip="{Binding AlarmTripValue}" Alarm="{Binding SwrAlarm}"
                      Fill="{DynamicResource AccentBrush}"
                      ShowPowerBar="{Binding Display.ShowPowerBar}" ShowSwrBar="{Binding Display.ShowSwrBar}"/>
 

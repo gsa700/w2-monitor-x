@@ -36,6 +36,10 @@ public sealed record W2Reading
     public bool? Pep { get; init; }
     public bool? Search { get; init; }
 
+    // SWR-alarm state, likewise echo-tracked (null = unknown until toggled/probed).
+    public bool? AlarmLock { get; init; }      // locking (latches until reset) vs non-locking
+    public double? AlarmTrip { get; init; }    // trip point 1.1–5.0; drives the SWR bar coloring
+
     /// <summary>Raw, non-printable-stripped I reply (kept for diagnostics).</summary>
     public string RawInfo { get; init; } = string.Empty;
 

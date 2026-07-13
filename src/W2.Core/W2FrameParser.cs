@@ -28,6 +28,7 @@ public static class W2FrameParser
 {
     private static readonly Regex PowerRx = new(@"^[FfRr](\d+)D(\d)", RegexOptions.Compiled);
     private static readonly Regex SwrRx = new(@"^[Ss](\d+)", RegexOptions.Compiled);
+    private static readonly Regex TripRx = new(@"[\[\]](\d+)", RegexOptions.Compiled);
 
     private static readonly Dictionary<char, (string Name, double FullScale)> Range = new()
     {
@@ -64,6 +65,15 @@ public static class W2FrameParser
         if (!long.TryParse(m.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var digits))
             return null;
         return digits / 100.0;
+    }
+
+    /// <summary>SWR-alarm trip point echo: "[nn;" / "]nn;" → nn/10 (1.1–5.0). Null if unmatched.</summary>
+    public static double? AlarmTrip(string? reply)
+    {
+        if (string.IsNullOrEmpty(reply)) return null;
+        var m = TripRx.Match(reply);
+        if (!m.Success) return null;
+        return long.TryParse(m.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) ? n / 10.0 : null;
     }
 
     /// <summary>Decode the I (info/status) reply. See the class remarks for the byte map.</summary>

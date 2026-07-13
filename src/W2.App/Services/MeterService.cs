@@ -58,6 +58,8 @@ public sealed class MeterService : IDisposable
     public bool LedsOn { get; private set; }
     public bool? Pep => Current?.Pep;
     public bool? Search => Current?.Search;
+    public bool? AlarmLock => Current?.AlarmLock;
+    public double? AlarmTrip => Current?.AlarmTrip;
     private int _rangeStep;
 
     /// <summary>Elapsed of the current over (live) or the last completed one.</summary>
@@ -164,6 +166,12 @@ public sealed class MeterService : IDisposable
         _reader.Send((char)('0' + _rangeStep));
     }
     public void ToggleLeds() { if (IsConnected) _reader.Send('L'); }      // "LEDs On/Off"
+
+    // --- SWR alarm (drives the rear-panel keyline-disconnect relay on the W2). ---
+    public void AlarmTripDown() { if (IsConnected) _reader.Send('['); }   // lower trip point 0.1
+    public void AlarmTripUp() { if (IsConnected) _reader.Send(']'); }     // raise trip point 0.1
+    public void ResetAlarm() { if (IsConnected) _reader.Send('C'); }      // clear a latched alarm
+    public void ToggleAlarmLock() { if (IsConnected) _reader.Send('A'); } // latch vs auto-clear
 
     private void TrackTx(W2Reading r)
     {

@@ -46,6 +46,22 @@ public class W2FrameParserTests
     public void Swr_null_on_nonmatch(string reply) =>
         Assert.Null(W2FrameParser.Swr(reply));
 
+    // ---- SWR-alarm trip point echo: [nn; / ]nn; → nn/10 ----
+
+    [Theory]
+    [InlineData("[11;", 1.1)]
+    [InlineData("]15;", 1.5)]
+    [InlineData("[20;", 2.0)]
+    [InlineData("]50;", 5.0)]
+    public void AlarmTrip_decodes(string reply, double expected) =>
+        Assert.Equal(expected, W2FrameParser.AlarmTrip(reply)!.Value, 1);
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("S150;")]
+    public void AlarmTrip_null_on_nonmatch(string reply) =>
+        Assert.Null(W2FrameParser.AlarmTrip(reply));
+
     // ---- I-string byte map ----
     // Payload (after leading 'I'): [1]=range [2]=auto [3]=type [5]=leds [6]=active.
     // "I0311012;" -> b="0311012": b1='3'(200W) b2='1'(auto) b3='1'(HF 2kW) b5='1'(leds) b6='2'(S2)

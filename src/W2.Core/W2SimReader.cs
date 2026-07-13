@@ -18,6 +18,8 @@ public sealed class W2SimReader : IReadingSource
     private volatile bool _running;
     private bool _pep;
     private bool _search = true;
+    private bool _alarmLock;
+    private double _alarmTrip = 2.0;
 
     /// <param name="phaseOffsetSeconds">Shifts the idle/TX cycle so multiple sims alternate overs.</param>
     public W2SimReader(double phaseOffsetSeconds = 0) => _phaseOffset = phaseOffsetSeconds;
@@ -44,9 +46,15 @@ public sealed class W2SimReader : IReadingSource
 
     public void Send(char command)
     {
-        if (command == 'N') _pep = !_pep;
-        else if (command == 'Y') _search = !_search;
-        // other commands (O/0/1/2/3/L) have no visible effect in the sim
+        switch (command)
+        {
+            case 'N': _pep = !_pep; break;
+            case 'Y': _search = !_search; break;
+            case 'A': _alarmLock = !_alarmLock; break;
+            case '[': _alarmTrip = Math.Max(1.1, Math.Round(_alarmTrip - 0.1, 1)); break;
+            case ']': _alarmTrip = Math.Min(5.0, Math.Round(_alarmTrip + 0.1, 1)); break;
+            // 'C' (reset), O/0/1/2/3/L have no visible effect in the sim
+        }
     }
 
     private void Loop()
@@ -55,6 +63,7 @@ public sealed class W2SimReader : IReadingSource
         var start = DateTime.UtcNow;
         var sampler = Sampler.S1;
         var wasTx = false;
+        var overCount = 0;
 
         while (_running)
         {
@@ -62,21 +71,20 @@ public sealed class W2SimReader : IReadingSource
             var cycle = t % 12.0;
             var tx = cycle is >= 3.0 and < 9.0;
 
-            // Flip the active sampler at the end of each over, like a Search-mode W2 following RF.
-            if (wasTx && !tx) sampler = sampler == Sampler.S1 ? Sampler.S2 : Sampler.S1;
+            // At the end of each over, flip the active sampler (like Search mode) and count overs.
+            if (wasTx && !tx) { sampler = sampler == Sampler.S1 ? Sampler.S2 : Sampler.S1; overCount++; }
             wasTx = tx;
 
-            var info = W2Wire.EncodeInfo(sampler, rangeKey: '3' /*200 W*/, autoRange: true,
-                typeKey: '1' /*HF 2 kW*/, leds: true);
-
             string f, r, s;
+            var swr = 1.0;
             if (tx)
             {
                 var into = cycle - 3.0;
                 var ramp = Math.Min(1.0, into / 0.5);                 // rise over the first 0.5 s
                 var target = 120.0 + 30.0 * Math.Sin(t * 3.0);        // wander ~90–150 W
                 var pf = Math.Max(0.0, target * ramp + (_rnd.NextDouble() * 4 - 2));
-                var swr = Math.Max(1.0, 1.25 + 0.30 * Math.Sin(t * 0.7));
+                // Every third over runs a high SWR so the alarm trips (once it exceeds the trip point).
+                swr = overCount % 3 == 0 ? 2.6 + 0.2 * Math.Sin(t * 2.0) : Math.Max(1.0, 1.25 + 0.30 * Math.Sin(t * 0.7));
                 var g = (swr - 1.0) / (swr + 1.0);
                 f = W2Wire.EncodePower('F', pf);
                 r = W2Wire.EncodePower('R', pf * g * g);
@@ -89,10 +97,17 @@ public sealed class W2SimReader : IReadingSource
                 s = W2Wire.EncodeSwr(1.0);
             }
 
+            // In alarm the W2 returns only "A!;" for the I command; otherwise the normal info string.
+            var alarm = tx && swr > _alarmTrip;
+            var info = alarm
+                ? "A!;"
+                : W2Wire.EncodeInfo(sampler, rangeKey: '3' /*200 W*/, autoRange: true, typeKey: '1' /*HF 2 kW*/, leds: true);
+
             // Occasional serial dropout: a field comes back empty this cycle.
             if (_rnd.NextDouble() < 0.04) { f = ""; r = ""; s = ""; }
 
-            ReadingReceived?.Invoke(W2FrameParser.Build(f, r, s, info) with { Pep = _pep, Search = _search });
+            ReadingReceived?.Invoke(W2FrameParser.Build(f, r, s, info)
+                with { Pep = _pep, Search = _search, AlarmLock = _alarmLock, AlarmTrip = _alarmTrip });
             Thread.Sleep(TickMs);
         }
 

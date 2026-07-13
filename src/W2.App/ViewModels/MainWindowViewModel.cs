@@ -99,6 +99,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private double _heldPeakValue;
     public double HeldPeakValue { get => _heldPeakValue; private set => SetProperty(ref _heldPeakValue, value); }
 
+    private double _alarmTripValue;   // SWR-alarm trip point (0 = unknown → fixed gradient)
+    public double AlarmTripValue { get => _alarmTripValue; private set => SetProperty(ref _alarmTripValue, value); }
+
+    private bool _swrAlarm;
+    public bool SwrAlarm { get => _swrAlarm; private set => SetProperty(ref _swrAlarm, value); }
+
     private string _reflectedText = "— W";
     public string ReflectedText { get => _reflectedText; private set => SetProperty(ref _reflectedText, value); }
 
@@ -144,6 +150,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         ReflectedText = m.LastReflectedW is { } refl ? $"{refl:0.0} W" : "— W";
         ReturnLossText = m.Current?.ReturnLossDb is { } rl ? $"{rl:0.0} dB" : "— dB";
         PeakText = $"{m.SessionPeakW:0.0} W";
+        AlarmTripValue = m.AlarmTrip ?? 0;
+        SwrAlarm = m.Alarm;
 
         // Line 2: sensor · type · range. A dedicated window names its meter in the title, so it
         // doesn't need the prefix; the focus window prefixes the in-use meter when >1 is connected.
@@ -174,8 +182,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     {
         PowerText = "— W"; SwrText = "—"; SwrBrush = Palette.DimBrush;
         ReflectedText = "— W"; ReturnLossText = "— dB"; PeakText = "0.0 W";
-        PowerBarValue = 0; SwrBarValue = 1.0; HeldPeakValue = 0; StatusLineText = "—"; TxBrush = Palette.DimBrush;
-        TxTimerText = "0:00";
+        PowerBarValue = 0; SwrBarValue = 1.0; HeldPeakValue = 0; AlarmTripValue = 0; SwrAlarm = false;
+        StatusLineText = "—"; TxBrush = Palette.DimBrush; TxTimerText = "0:00";
     }
 
     public void Dispose()

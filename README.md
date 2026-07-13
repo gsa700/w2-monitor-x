@@ -29,6 +29,9 @@ Raspberry Pi**. Built with .NET 8 + Avalonia.
   per meter, so it holds independently across multiple W2s.
 - **Full W2 control** from Setup (acts on the selected meter): Auto Sensor, Auto Range, Avg/PEP,
   Manual Sensor, Manual Range, LEDs — with live lamp states.
+- **SWR alarm** — the SWR bar is colored so it "goes red where your alarm trips," and flashes on a
+  live alarm. Set the trip point, reset a latched alarm, or toggle latching from Setup — it drives
+  the W2's rear-panel keyline-disconnect relay.
 - **TX-timeout timer** — solid yellow 30 s before timeout, flashing red at/after (silent).
 - **Follows your cable** by its USB chip serial (Windows) or `/dev/serial/by-id` (Linux), so a
   meter keeps its identity across port renumbering.

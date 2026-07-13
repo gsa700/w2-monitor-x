@@ -39,6 +39,10 @@ public sealed class SetupViewModel : ViewModelBase
         SensorCommand = new RelayCommand(() => SelectedRow?.Meter.SwitchSensor(), () => CanControl);
         RangeCommand = new RelayCommand(() => SelectedRow?.Meter.StepRange(), () => CanControl);
         LedsCommand = new RelayCommand(() => SelectedRow?.Meter.ToggleLeds(), () => CanControl);
+        AlarmDownCommand = new RelayCommand(() => SelectedRow?.Meter.AlarmTripDown(), () => CanControl);
+        AlarmUpCommand = new RelayCommand(() => SelectedRow?.Meter.AlarmTripUp(), () => CanControl);
+        AlarmLockCommand = new RelayCommand(() => SelectedRow?.Meter.ToggleAlarmLock(), () => CanControl);
+        ResetAlarmCommand = new RelayCommand(() => SelectedRow?.Meter.ResetAlarm(), () => CanControl);
         ResetPeakCommand = new RelayCommand(() => _manager.Focus?.ResetPeak());
 
         UpdateCommand = new RelayCommand(() => _ = UpdateButtonAsync(), () => !_updateBusy);
@@ -69,7 +73,15 @@ public sealed class SetupViewModel : ViewModelBase
     public RelayCommand SensorCommand { get; }
     public RelayCommand RangeCommand { get; }
     public RelayCommand LedsCommand { get; }
+    public RelayCommand AlarmDownCommand { get; }
+    public RelayCommand AlarmUpCommand { get; }
+    public RelayCommand AlarmLockCommand { get; }
+    public RelayCommand ResetAlarmCommand { get; }
     public RelayCommand ResetPeakCommand { get; }
+
+    /// <summary>Selected meter's SWR-alarm state, for the Setup alarm controls.</summary>
+    public string AlarmTripLabel => SelectedRow?.Meter?.AlarmTrip is { } t ? $"SWR {t:0.0}" : "SWR —";
+    public IBrush AlarmLockBrush => LampBrush(SelectedRow?.Meter?.AlarmLock == true);
     public RelayCommand UpdateCommand { get; }
     public RelayCommand OpenReleaseCommand { get; }
 
@@ -93,7 +105,10 @@ public sealed class SetupViewModel : ViewModelBase
         OnPropertyChanged(nameof(LedsBrush));
         OnPropertyChanged(nameof(SearchBrush));
         OnPropertyChanged(nameof(AvgPepLabel));
-        foreach (var c in new[] { SearchCommand, AutoRangeCommand, AvgPepCommand, SensorCommand, RangeCommand, LedsCommand })
+        OnPropertyChanged(nameof(AlarmTripLabel));
+        OnPropertyChanged(nameof(AlarmLockBrush));
+        foreach (var c in new[] { SearchCommand, AutoRangeCommand, AvgPepCommand, SensorCommand, RangeCommand, LedsCommand,
+            AlarmDownCommand, AlarmUpCommand, AlarmLockCommand, ResetAlarmCommand })
             c.RaiseCanExecuteChanged();
     }
 

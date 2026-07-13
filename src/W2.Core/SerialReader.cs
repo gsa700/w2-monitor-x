@@ -34,6 +34,7 @@ public sealed class SerialReader : IReadingSource
 
     private static readonly Regex NEcho = new(@"[Nn]([AP])", RegexOptions.Compiled);
     private static readonly Regex YEcho = new(@"[Yy]([01])", RegexOptions.Compiled);
+    private static readonly Regex AEcho = new(@"[Aa]([01])", RegexOptions.Compiled);
     private static readonly Regex FwdRf = new(@"[Ff](\d+)D(\d)", RegexOptions.Compiled);
 
     private readonly ConcurrentQueue<char> _cmds = new();
@@ -44,6 +45,8 @@ public sealed class SerialReader : IReadingSource
     private volatile bool _linkFaulted;   // set when a query hits a hard port error (device gone)
     private bool? _pep;
     private bool? _search;
+    private bool? _alarmLock;      // SWR-alarm locking mode (A command)
+    private double? _alarmTrip;    // SWR-alarm trip point 1.1–5.0 ([ / ] commands)
 
     public event Action<W2Reading>? ReadingReceived;
     public event Action<string, bool>? StatusChanged;  // (message, isError)
@@ -59,6 +62,8 @@ public sealed class SerialReader : IReadingSource
         Stop();
         _pep = null;
         _search = null;
+        _alarmLock = null;
+        _alarmTrip = null;
         while (_cmds.TryDequeue(out _)) { }
         _stop.Reset();
         _running = true;
@@ -182,7 +187,8 @@ public sealed class SerialReader : IReadingSource
                 var i = Query('I');
                 health.RecordCycle(f is not null || r is not null || s is not null || i is not null);
                 if (_linkFaulted) health.Fault();
-                ReadingReceived?.Invoke(W2FrameParser.Build(f, r, s, i) with { Pep = _pep, Search = _search });
+                ReadingReceived?.Invoke(W2FrameParser.Build(f, r, s, i)
+                    with { Pep = _pep, Search = _search, AlarmLock = _alarmLock, AlarmTrip = _alarmTrip });
                 if (_stop.Wait(PollIntervalMs)) break;
             }
 
@@ -200,14 +206,20 @@ public sealed class SerialReader : IReadingSource
         }
     }
 
-    /// <summary>Send any queued commands, capturing the N/Y echoes to track Avg-PEP / Search.</summary>
+    /// <summary>Send any queued commands, capturing echoes to track Avg-PEP / Search / alarm state.</summary>
     private void DrainCommands()
     {
         while (_cmds.TryDequeue(out var cmd))
         {
             var reply = Query(cmd);
-            if (cmd == 'N' && reply is not null && NEcho.Match(reply) is { Success: true } n) _pep = n.Groups[1].Value == "P";
-            else if (cmd == 'Y' && reply is not null && YEcho.Match(reply) is { Success: true } y) _search = y.Groups[1].Value == "1";
+            if (reply is null) continue;
+            switch (cmd)
+            {
+                case 'N' when NEcho.Match(reply) is { Success: true } n: _pep = n.Groups[1].Value == "P"; break;
+                case 'Y' when YEcho.Match(reply) is { Success: true } y: _search = y.Groups[1].Value == "1"; break;
+                case 'A' when AEcho.Match(reply) is { Success: true } a: _alarmLock = a.Groups[1].Value == "1"; break;
+                case '[' or ']' when W2FrameParser.AlarmTrip(reply) is { } trip: _alarmTrip = trip; break;
+            }
         }
     }
 
@@ -227,6 +239,12 @@ public sealed class SerialReader : IReadingSource
         if (Query('N') is { } n && NEcho.Match(n) is { Success: true } nm) _pep = nm.Groups[1].Value == "P";
         Query('Y');
         if (Query('Y') is { } y && YEcho.Match(y) is { Success: true } ym) _search = ym.Groups[1].Value == "1";
+        Query('A');
+        if (Query('A') is { } a && AEcho.Match(a) is { Success: true } am) _alarmLock = am.Groups[1].Value == "1";
+        // Read the SWR-alarm trip point with a net-zero nudge (raise then lower); the '[' echo is the
+        // restored value (unchanged except a trip already at the 5.0 ceiling, which nets to 4.9).
+        Query(']');
+        if (Query('[') is { } t && W2FrameParser.AlarmTrip(t) is { } trip) _alarmTrip = trip;
     }
 
     /// <summary>Write a single command char and read back one ';'-terminated reply.</summary>
