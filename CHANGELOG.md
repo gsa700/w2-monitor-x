@@ -3,6 +3,21 @@
 Cross-platform **W2 Monitor** (.NET 8 + Avalonia). Companion to the original PowerShell
 app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
+## [0.3.7-beta] - 2026-07-12
+
+### Fixed
+- **Alternating S1/S2 transmit no longer ignores the second sampler.** When you keyed one
+  sampler, stopped, then keyed the other, the readout could stick on the first for several
+  seconds (often the whole over) because the W2 stops hunting to the sampler that went quiet. It
+  now follows the RF over to the active sampler promptly — while still holding through stray RF
+  the meter hunts to on the idle sampler during a single over.
+
+### Changed
+- **Window mode is now a simple toggle.** Replaced "open a dedicated window for the selected
+  meter" with a **"One window per meter"** checkbox in Setup (shown with 2+ meters): off is one
+  auto-focus window, on gives a dedicated window per meter (no separate focus window). Switching
+  opens the new layout before closing the old, so you can't lose your last window.
+
 ## [0.3.6-beta] - 2026-07-12
 
 ### Added
