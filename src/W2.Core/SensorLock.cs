@@ -1,35 +1,39 @@
 namespace W2.Core;
 
 /// <summary>
-/// In Search mode the W2 hops between its two samplers. If the idle sampler catches stray RF, the
-/// readout flickers between the real over and the stray reading. This locks the display to the
-/// sampler actually carrying RF and rejects frames from the other one until that over ends —
-/// "when a sensor is active, ignore the others until it's no longer active."
+/// In Search mode the W2 hops between its two samplers. This locks the display to the sampler
+/// actually carrying RF and rejects frames from the other — "when a sensor is active, ignore the
+/// others" — so a little stray RF on the idle sampler doesn't make the readout flicker.
 ///
-/// Robustness: it locks to the *stronger* sampler (so a stray frame arriving first can't hijack
-/// the display — the real over steals the lock), tracks the locked sampler's peak so a voice/PEP
-/// trough can't let the stray steal it back, and releases when the locked sampler stops
-/// transmitting (or after a long run of unattributable misses). Pure and unit-tested; the meter
-/// feeds it one (active sampler, forward power) per cycle.
+/// It distinguishes two situations that look similar frame-to-frame:
+///  - <b>Stray during one over:</b> the W2 keeps hunting back to the live sampler, so we keep
+///    seeing it — the lock holds and the stray (weaker, and/or interleaved) is ignored.
+///  - <b>RF moved to the other sampler</b> (you keyed the other antenna): the W2 locks onto the
+///    new sampler and stops visiting the old one, so we stop seeing the locked sampler. When the
+///    other sampler is transmitting and the locked one has gone quiet for a few frames, we follow
+///    the RF over to it. A far-stronger sampler switches immediately; a long unattributable run
+///    releases the lock as a fail-safe. Pure and unit-tested; fed one (sampler, power) per cycle.
 /// </summary>
 public sealed class SensorLock
 {
     private readonly double _thresholdW;
     private readonly double _switchMargin;
-    private readonly int _releaseAfterMisses;
+    private readonly int _switchAfter;
+    private readonly int _releaseAfter;
 
     private Sampler _locked = Sampler.Unknown;
     private double _lockedPeakW;
-    private int _misses;
+    private int _sinceLocked;   // frames since we last saw the locked sampler
 
-    public SensorLock(double transmitThresholdW = 0.5, double switchMargin = 1.5, int releaseAfterMisses = 30)
+    public SensorLock(double transmitThresholdW = 0.5, double switchMargin = 1.5,
+        int switchAfterFrames = 3, int releaseAfterFrames = 30)
     {
         _thresholdW = transmitThresholdW;
         _switchMargin = switchMargin;
-        _releaseAfterMisses = releaseAfterMisses;
+        _switchAfter = switchAfterFrames;
+        _releaseAfter = releaseAfterFrames;
     }
 
-    /// <summary>The sampler currently locked, or Unknown when not locked.</summary>
     public Sampler Locked => _locked;
 
     /// <summary>Feed one cycle. Returns true if the frame should drive the display.</summary>
@@ -42,30 +46,36 @@ public sealed class SensorLock
 
         if (_locked == Sampler.Unknown)
         {
-            // Lock to the first sampler seen actually transmitting; pass everything through until then.
-            if (transmitting) { _locked = active; _lockedPeakW = power; _misses = 0; }
+            if (transmitting) { _locked = active; _lockedPeakW = power; _sinceLocked = 0; }
             return true;
         }
 
         if (active == _locked)
         {
-            _misses = 0;
+            _sinceLocked = 0;
             _lockedPeakW = Math.Max(_lockedPeakW, power);
             if (!transmitting) { _locked = Sampler.Unknown; _lockedPeakW = 0; }   // over ended → release
             return true;
         }
 
         // A different, identifiable sampler while we're locked.
-        if (transmitting && power > _lockedPeakW * _switchMargin)   // real RF clearly moved here
+        _sinceLocked++;
+        var clearlyStronger = transmitting && power > _lockedPeakW * _switchMargin;   // far hotter → real RF here
+        var lockedWentQuiet = transmitting && _sinceLocked >= _switchAfter;           // RF moved to this sampler
+        if (clearlyStronger || lockedWentQuiet)
         {
-            _locked = active; _lockedPeakW = power; _misses = 0;
+            _locked = active; _lockedPeakW = power; _sinceLocked = 0;
+            return true;   // follow the RF over to this sampler
+        }
+
+        if (_sinceLocked >= _releaseAfter)   // fail-safe: haven't seen the locked sampler in a long time
+        {
+            _locked = Sampler.Unknown; _lockedPeakW = 0; _sinceLocked = 0;
             return true;
         }
 
-        // Otherwise it's the stray / idle sampler — ignore it (but bail out of a stuck lock eventually).
-        if (++_misses >= _releaseAfterMisses) { _locked = Sampler.Unknown; _lockedPeakW = 0; _misses = 0; }
-        return false;
+        return false;   // stray / idle sampler → ignore for display
     }
 
-    public void Reset() { _locked = Sampler.Unknown; _lockedPeakW = 0; _misses = 0; }
+    public void Reset() { _locked = Sampler.Unknown; _lockedPeakW = 0; _sinceLocked = 0; }
 }

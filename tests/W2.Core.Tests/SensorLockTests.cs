@@ -69,9 +69,37 @@ public class SensorLockTests
     [Fact]
     public void Releases_after_a_long_run_of_misses()
     {
-        var s = new SensorLock(releaseAfterMisses: 5);
+        var s = new SensorLock(releaseAfterFrames: 5);
         s.Accept(Sampler.S1, 100.0);                 // lock S1
-        for (var i = 0; i < 5; i++) s.Accept(Sampler.S2, 0.4);   // stray only, S1 never returns
+        for (var i = 0; i < 5; i++) s.Accept(Sampler.S2, 0.4);   // idle stray only, S1 never returns
         Assert.Equal(Sampler.Unknown, s.Locked);     // bailed out of the stuck lock
+    }
+
+    [Fact]
+    public void Follows_rf_when_you_key_the_other_sampler()
+    {
+        // Separate overs: key S1, then key S2. The W2 locks to S2 and stops visiting S1, so the
+        // locked sampler goes quiet — we should switch to S2 promptly (not ignore it for seconds).
+        var s = new SensorLock(switchAfterFrames: 3);
+        s.Accept(Sampler.S1, 100.0);                 // lock S1
+        Assert.False(s.Accept(Sampler.S2, 100.0));   // S1 quiet 1 frame — hold
+        Assert.False(s.Accept(Sampler.S2, 100.0));   // 2
+        Assert.True(s.Accept(Sampler.S2, 100.0));    // 3 → RF has moved: follow it to S2
+        Assert.Equal(Sampler.S2, s.Locked);
+    }
+
+    [Fact]
+    public void Interleaved_stray_does_not_trigger_the_move_switch()
+    {
+        // Original bug scenario: within one over the W2 keeps hunting back to the live S1, so the
+        // locked sampler never stays quiet long enough — the stray on S2 stays ignored.
+        var s = new SensorLock(switchAfterFrames: 3);
+        s.Accept(Sampler.S1, 100.0);                 // lock S1
+        for (var i = 0; i < 6; i++)
+        {
+            Assert.False(s.Accept(Sampler.S2, 2.0));  // stray (even above threshold) → ignored
+            Assert.True(s.Accept(Sampler.S1, 100.0)); // live sampler keeps reappearing → resets the counter
+        }
+        Assert.Equal(Sampler.S1, s.Locked);
     }
 }
