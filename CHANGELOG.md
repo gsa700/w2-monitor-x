@@ -3,6 +3,17 @@
 Cross-platform **W2 Monitor** (.NET 8 + Avalonia). Companion to the original PowerShell
 app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
+## [0.3.8-beta] - 2026-07-12
+
+### Added
+- **SWR alarm.** The SWR bar is now colored so it "goes red where your alarm trips," and flashes
+  red on a live alarm. A new Setup **SWR ALARM** group sets the trip point (▼/▲, 1.1–5.0), resets
+  a latched alarm, and toggles latching — driving the W2's rear-panel keyline-disconnect relay.
+  The trip point is read from the meter on connect so the bar anchors correctly.
+
+### Changed
+- **SWR bar matches the power bar** — same height and square corners, so they read as a pair.
+
 ## [0.3.7-beta] - 2026-07-12
 
 ### Fixed
