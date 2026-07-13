@@ -1,3 +1,4 @@
+using System.Reflection;
 using Avalonia.Media;
 using Avalonia.Threading;
 using W2.App.Services;
@@ -7,32 +8,69 @@ using W2.Core;
 namespace W2.App.ViewModels;
 
 /// <summary>
-/// Renders whichever meter the <see cref="MeterManager"/> has in focus. Per-meter state lives on
-/// the meter, so this is a thin formatter. A 500 ms tick keeps the TX timer counting smoothly and
-/// drives the flashing over-time state even when readings pause.
+/// Renders one W2's readout. Two modes: <b>focus</b> (follows whichever meter the
+/// <see cref="MeterManager"/> has focused — the default single window) and <b>pinned</b>
+/// (always shows one specific <see cref="MeterService"/> — a dedicated per-meter window).
+/// Per-meter state lives on the meter, so this is a thin formatter. A 500 ms tick keeps the TX
+/// timer counting and drives the flashing over-time state. Dispose unsubscribes + stops the tick
+/// so per-meter windows can open and close cleanly.
 /// </summary>
-public sealed class MainWindowViewModel : ViewModelBase
+public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 {
-    private readonly MeterManager _manager;
+    private readonly MeterManager? _manager;   // focus mode
+    private readonly MeterService? _pinned;    // pinned mode
     private readonly DispatcherTimer _tick;
     private bool _flashOn;
 
-    public MainWindowViewModel(MeterManager manager, DisplaySettings display)
+    /// <summary>Focus mode — follows the manager's focused meter.</summary>
+    public MainWindowViewModel(MeterManager manager, DisplaySettings display) : this(display)
     {
         _manager = manager;
-        Display = display;
         _manager.FocusReadingUpdated += Render;
         _manager.MetersChanged += Render;
-
-        _tick = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
-        _tick.Tick += (_, _) => { _flashOn = !_flashOn; UpdateTx(); };
-        _tick.Start();
-
         Render();
     }
 
-    public string TitleText => "W2 MONITOR";
+    /// <summary>Pinned mode — always shows one meter (a dedicated window).</summary>
+    public MainWindowViewModel(MeterService meter, DisplaySettings display) : this(display)
+    {
+        _pinned = meter;
+        _pinned.ReadingReceived += OnMeter;
+        _pinned.StateChanged += OnMeter;
+        Render();
+    }
+
+    private MainWindowViewModel(DisplaySettings display)
+    {
+        Display = display;
+        _tick = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        _tick.Tick += (_, _) => { _flashOn = !_flashOn; UpdateTx(); };
+        _tick.Start();
+    }
+
+    private void OnMeter(MeterService _) => Render();
+
+    /// <summary>The meter this window is currently showing.</summary>
+    private MeterService? Target => _pinned ?? _manager?.Focus;
+
     public DisplaySettings Display { get; }
+
+    // Header: the app name in focus mode, or the meter's name in a dedicated window.
+    public string TitleText => _pinned is { } m ? m.Name.ToUpperInvariant() : "W2 MONITOR";
+
+    // Title bar: "W2 Monitor vX" or "W2 #1 — W2 Monitor vX".
+    public string WindowTitle
+    {
+        get
+        {
+            var v = Assembly.GetExecutingAssembly()
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "";
+            var plus = v.IndexOf('+');
+            if (plus >= 0) v = v[..plus];
+            var app = string.IsNullOrEmpty(v) ? "W2 Monitor" : $"W2 Monitor v{v}";
+            return _pinned is { } m ? $"{m.Name} — {app}" : app;
+        }
+    }
 
     private IBrush _connDotBrush = Palette.DimBrush;
     public IBrush ConnDotBrush { get => _connDotBrush; private set => SetProperty(ref _connDotBrush, value); }
@@ -78,12 +116,12 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private void Render()
     {
-        var m = _manager.Focus;
+        var m = Target;
         if (m is null || !m.IsConnected)
         {
             ConnDotBrush = Palette.DimBrush;
             Blank();
-            StatusLineText = _manager.Meters.Count == 0 ? "No meters — open Setup" : "Disconnected";
+            StatusLineText = _pinned is null && _manager!.Meters.Count == 0 ? "No meters — open Setup" : "Disconnected";
             return;
         }
 
@@ -106,9 +144,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         ReflectedText = m.LastReflectedW is { } refl ? $"{refl:0.0} W" : "— W";
         ReturnLossText = m.Current?.ReturnLossDb is { } rl ? $"{rl:0.0} dB" : "— dB";
         PeakText = $"{m.SessionPeakW:0.0} W";
-        // Line 2: sensor · type · range, prefixed with the meter name when >1 meter is connected
-        // (which W2 is "in use"), like the earlier version.
-        var prefix = _manager.Meters.Count(x => x.IsConnected) > 1 ? $"{m.Name} · " : "";
+
+        // Line 2: sensor · type · range. A dedicated window names its meter in the title, so it
+        // doesn't need the prefix; the focus window prefixes the in-use meter when >1 is connected.
+        var prefix = _pinned is null && _manager!.Meters.Count(x => x.IsConnected) > 1 ? $"{m.Name} · " : "";
         StatusLineText = m.Alarm ? "⚠ SWR ALARM" : $"{prefix}{m.SensorLabel} · {m.TypeLabel} · {m.RangeLabel}";
 
         UpdateTx();
@@ -117,7 +156,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>TX timer text + color, incl. the yellow→flashing-red timeout states.</summary>
     private void UpdateTx()
     {
-        var m = _manager.Focus;
+        var m = Target;
         if (m is null || !m.IsConnected) { TxTimerText = "0:00"; TxBrush = Palette.DimBrush; return; }
 
         TxTimerText = TxTimer.Format(m.TxElapsed);
@@ -137,5 +176,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         ReflectedText = "— W"; ReturnLossText = "— dB"; PeakText = "0.0 W";
         PowerBarValue = 0; SwrBarValue = 1.0; HeldPeakValue = 0; StatusLineText = "—"; TxBrush = Palette.DimBrush;
         TxTimerText = "0:00";
+    }
+
+    public void Dispose()
+    {
+        _tick.Stop();
+        if (_manager is not null) { _manager.FocusReadingUpdated -= Render; _manager.MetersChanged -= Render; }
+        if (_pinned is not null) { _pinned.ReadingReceived -= OnMeter; _pinned.StateChanged -= OnMeter; }
     }
 }

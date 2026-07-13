@@ -22,7 +22,8 @@ Raspberry Pi**. Built with .NET 8 + Avalonia.
 - **Multiple W2 meters at once** — each on its own background thread; the main display
   auto-focuses whichever meter is transmitting (the **strongest**, if several key at once —
   the others keep tracking in the background; pin one in **Setup** to watch it). **Detect**
-  finds connected meters.
+  finds connected meters. With several meters you can also open a **dedicated window per meter**
+  (Setup → *Open a dedicated window…*) and lay them out side-by-side; your layout is remembered.
 - **Steady in Search mode** — when the W2 hunts between its two samplers, the readout locks to
   the sampler carrying your over and ignores stray RF the meter picks up on the other. Applied
   per meter, so it holds independently across multiple W2s.

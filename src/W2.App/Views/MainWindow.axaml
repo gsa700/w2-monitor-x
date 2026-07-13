@@ -7,7 +7,7 @@
         Width="470" SizeToContent="Height" CanResize="False"
         Background="{StaticResource BgBrush}"
         Icon="/Assets/app.ico"
-        Title="W2 Monitor">
+        Title="{Binding WindowTitle}">
 
   <Grid Margin="16,12" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
 

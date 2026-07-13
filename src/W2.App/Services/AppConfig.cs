@@ -13,6 +13,7 @@ public sealed class AppConfig
 
     public List<MeterConfig> Meters { get; set; } = new();
     public bool CheckUpdatesAtStartup { get; set; }
+    public bool FocusWindowOpen { get; set; } = true;   // the auto-focus main window (default on)
     public DisplayConfig Display { get; set; } = new();
 
     // --- legacy single-meter fields (Phase 2 config); migrated on load ---
@@ -63,6 +64,11 @@ public sealed class MeterConfig
     public string Name { get; set; } = "W2";
     public string? Port { get; set; }
     public string? Serial { get; set; }
+
+    // Dedicated per-meter window: last position and whether it was open at exit (for restore).
+    public double? WinX { get; set; }
+    public double? WinY { get; set; }
+    public bool WinOpen { get; set; }
 }
 
 /// <summary>Plain (serializable) mirror of <see cref="DisplaySettings"/>.</summary>

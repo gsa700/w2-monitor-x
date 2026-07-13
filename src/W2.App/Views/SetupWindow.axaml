@@ -56,6 +56,11 @@
     <TextBlock Text="The main display auto-follows whichever meter is transmitting; pick one here to pin it."
                Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
 
+    <!-- Dedicated per-meter window (only useful with more than one meter) -->
+    <Button Content="Open a dedicated window for the selected meter"
+            Command="{Binding OpenWindowCommand}" IsVisible="{Binding MultipleMeters}"
+            HorizontalAlignment="Left"/>
+
     <!-- W2 controls (act on the selected meter) -->
     <TextBlock Text="W2 CONTROLS" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}" Margin="0,4,0,0"/>
     <TextBlock Text="Act on the selected meter (must be connected)." Foreground="{StaticResource DimBrush}" FontSize="11"/>
