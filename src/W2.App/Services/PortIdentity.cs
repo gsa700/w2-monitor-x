@@ -46,8 +46,16 @@ public static class PortIdentity
         if (!Directory.Exists(ByIdDir)) return;
         foreach (var link in Directory.GetFileSystemEntries(ByIdDir))
         {
-            var target = File.ResolveLinkTarget(link, returnFinalTarget: true)?.FullName;
-            if (target is not null) map[target] = System.IO.Path.GetFileName(link);
+            // Guard each entry: a dangling symlink (or a device torn down mid-enumeration) makes
+            // ResolveLinkTarget throw. Without this, one bad entry would abort the whole loop and
+            // drop every cable after it from the map — so the OTHER W2 couldn't follow its cable
+            // across a renumber, the exact failure by-id pinning exists to prevent.
+            try
+            {
+                var target = File.ResolveLinkTarget(link, returnFinalTarget: true)?.FullName;
+                if (target is not null) map[target] = System.IO.Path.GetFileName(link);
+            }
+            catch { /* skip this entry, keep the rest */ }
         }
     }
 

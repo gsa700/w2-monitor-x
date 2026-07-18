@@ -3,6 +3,33 @@
 Cross-platform **W2 Monitor** (.NET 8 + Avalonia). Companion to the original PowerShell
 app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
+## [0.4.1-beta] - 2026-07-17
+
+### Fixed
+- **Config is now saved atomically and never silently reset to empty.** A crash or power loss
+  mid-save could leave `config.json` truncated; the next launch would fail to parse it, fall back
+  to defaults, and then overwrite the file with an empty config — losing every meter and its serial
+  pinning. Saves now write to a temp file and atomically rename it into place, and an unreadable
+  config is preserved as `config.json.bak` instead of being discarded. (`AtomicFile` in W2.Core.)
+- **Disconnecting a meter no longer leaves it stuck "transmitting."** A reading already queued to
+  the UI thread when you disconnected could run afterward, re-showing live data, sticking the TX
+  indicator on, and even stealing focus for the disconnected meter. Queued reader callbacks are now
+  dropped once disconnect begins. (`MeterService`.)
+- **Reset Peak now resets the meter you selected in Setup**, not whichever meter currently has
+  auto-focus. (`SetupViewModel`.)
+- **A failed in-app update no longer looks like it succeeded.** If the file swap failed (file locked
+  or not writable), the helper used to relaunch the old exe while the UI claimed the update applied.
+  The swap is now checked; on failure the app relaunches and, on next start, tells you the update
+  didn't apply and you're still on the old version. (`UpdateApplyScript` in W2.Core.)
+- **Linux: one bad `/dev/serial/by-id` symlink no longer drops the other cables.** A dangling entry
+  (common mid-replug) previously aborted the whole port scan, so a second W2 couldn't follow its
+  cable across a renumber. Each entry is now handled independently. (`PortIdentity`.)
+
+### Changed
+- **One-window-per-meter mode: closing any meter window closes them all.** The per-meter windows are
+  one app view, so closing one now closes the rest (and exits) instead of making you close each one.
+  Removing a single meter or switching window modes still closes just the affected window.
+
 ## [0.4.0-beta] - 2026-07-17
 
 ### Fixed

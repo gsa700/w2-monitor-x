@@ -6,6 +6,7 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using W2.Core;
 
 namespace W2.App.Services;
 
@@ -129,14 +130,12 @@ public static class UpdateService
             ?? throw new InvalidOperationException("Cannot determine the current executable path.");
         var pid = Environment.ProcessId;
         var dir = Path.GetDirectoryName(stagedExe)!;
+        var marker = UpdateFailedMarkerPath(target);
 
         if (OperatingSystem.IsWindows())
         {
             var ps1 = Path.Combine(dir, "apply-update.ps1");
-            File.WriteAllText(ps1,
-                $"while (Get-Process -Id {pid} -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 300 }}\n" +
-                $"Copy-Item -LiteralPath '{stagedExe}' -Destination '{target}' -Force\n" +
-                $"Start-Process -FilePath '{target}'\n");
+            File.WriteAllText(ps1, UpdateApplyScript.Windows(pid, stagedExe, target, marker));
             Process.Start(new ProcessStartInfo
             {
                 FileName = "powershell.exe",
@@ -148,14 +147,28 @@ public static class UpdateService
         else
         {
             var sh = Path.Combine(dir, "apply-update.sh");
-            File.WriteAllText(sh,
-                "#!/bin/sh\n" +
-                $"while kill -0 {pid} 2>/dev/null; do sleep 0.3; done\n" +
-                $"cp -f '{stagedExe}' '{target}'\n" +
-                $"chmod +x '{target}'\n" +
-                $"'{target}' &\n");
+            File.WriteAllText(sh, UpdateApplyScript.Unix(pid, stagedExe, target, marker));
             Process.Start(new ProcessStartInfo { FileName = "/bin/sh", Arguments = $"\"{sh}\"", UseShellExecute = false });
         }
+    }
+
+    /// <summary>Path of the marker the apply helper drops next to the exe when the file swap fails.</summary>
+    private static string UpdateFailedMarkerPath(string targetExe) =>
+        Path.Combine(Path.GetDirectoryName(targetExe) ?? ".", ".w2monitor-update-failed");
+
+    /// <summary>
+    /// True once if the previous apply helper reported a failed copy (it relaunched the old exe).
+    /// Clears the marker so the warning shows only on the next start, not every start.
+    /// </summary>
+    public static bool ConsumeUpdateFailed()
+    {
+        try
+        {
+            var p = UpdateFailedMarkerPath(Environment.ProcessPath ?? "");
+            if (File.Exists(p)) { File.Delete(p); return true; }
+        }
+        catch { /* ignore */ }
+        return false;
     }
 
     private static Version? ParseVer(string s)

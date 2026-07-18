@@ -1,5 +1,6 @@
 using System.Text.Json;
 using W2.App.Settings;
+using W2.Core;
 
 namespace W2.App.Services;
 
@@ -113,13 +114,20 @@ public static class ConfigStore
                 return cfg;
             }
         }
-        catch { /* fall through to defaults */ }
+        catch
+        {
+            // The file exists but couldn't be read/parsed. Preserve it as config.json.bak instead of
+            // silently running with defaults that the next Save would overwrite it with — which would
+            // lose the user's meters and serial pinning with no recovery path.
+            AtomicFile.Backup(Path);
+        }
         return new AppConfig();
     }
 
     public static void Save(AppConfig config)
     {
-        try { File.WriteAllText(Path, JsonSerializer.Serialize(config, Options)); }
+        // Atomic (temp + rename): a crash mid-write must not truncate config.json to nothing.
+        try { AtomicFile.WriteAllText(Path, JsonSerializer.Serialize(config, Options)); }
         catch { /* best effort */ }
     }
 }

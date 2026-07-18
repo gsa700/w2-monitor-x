@@ -16,6 +16,11 @@ public sealed class MeterService : IDisposable
     private readonly IReadingSource _reader;
     private readonly SensorLock _sensorLock = new();
 
+    // Gate for the reader's UI-thread callbacks. A reading/status posted to the dispatcher just before
+    // Disconnect() runs would otherwise execute after it and resurrect Current/IsTransmitting (which,
+    // with no further frame to clear it, sticks TX on and can steal manual focus). Cleared before Stop().
+    private volatile bool _accepting;
+
     // TX tracking (per meter, so the manager can pick who's transmitting).
     private DateTime _txStart;
     private DateTime _txLast;
@@ -88,6 +93,7 @@ public sealed class MeterService : IDisposable
 
         _reader.ReadingReceived += r => Dispatcher.UIThread.Post(() =>
         {
+            if (!_accepting) return;   // stale frame queued before Disconnect() — don't resurrect state
             // While a sampler is carrying the over, ignore frames the W2 hunts to on the other
             // sampler (e.g. stray RF) so the readout doesn't flicker between them.
             if (!_sensorLock.Accept(r.ActiveSampler, r.ForwardPowerW)) return;
@@ -99,6 +105,7 @@ public sealed class MeterService : IDisposable
 
         _reader.StatusChanged += (msg, isError) => Dispatcher.UIThread.Post(() =>
         {
+            if (!_accepting) return;   // status queued before Disconnect() — keep "Disconnected" authoritative
             Status = msg;
             StatusIsError = isError;
             if (isError) IsConnected = false;
@@ -112,6 +119,7 @@ public sealed class MeterService : IDisposable
     public void Connect()
     {
         if (Port is null) return;
+        _accepting = true;
         _sensorLock.Reset();
         Status = $"Connecting {Port}…";
         StatusIsError = false;
@@ -137,6 +145,7 @@ public sealed class MeterService : IDisposable
 
     public void Disconnect()
     {
+        _accepting = false;   // drop any reader callback already queued to the UI thread
         _reader.Stop();
         _sensorLock.Reset();
         IsConnected = false;

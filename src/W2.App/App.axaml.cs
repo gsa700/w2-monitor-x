@@ -24,6 +24,10 @@ public partial class App : Application
     private readonly Dictionary<string, MainWindow> _meterWindows = new();
     private SetupWindow? _setupWindow;
 
+    // Set while we close meter windows ourselves (mode switch, meter removal, update exit) so the
+    // user-close cascade in NotifyMainWindowClosing doesn't fire — those closes must not quit the app.
+    private bool _programmaticClose;
+
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
     public override void OnFrameworkInitializationCompleted()
@@ -55,12 +59,16 @@ public partial class App : Application
             _manager.MetersChanged += OnMetersChanged;
             desktop.Exit += (_, _) => { SaveConfig(); _manager.Dispose(); };
 
+            // A previous in-app update whose file swap failed left a marker and relaunched the old exe.
+            var updateFailed = !simulated && UpdateService.ConsumeUpdateFailed();
+            if (updateFailed) _setupVm.NoteUpdateFailed();
+
             var openSetup = Environment.GetCommandLineArgs()
                 .Any(a => a.Equals("--setup", StringComparison.OrdinalIgnoreCase));
             windows[0].Opened += async (_, _) =>
             {
                 for (var i = 1; i < windows.Count; i++) windows[i].Show();   // the primary is auto-shown
-                if (openSetup) ShowSetup();
+                if (openSetup || updateFailed) ShowSetup();
                 if (_config.CheckUpdatesAtStartup)
                 {
                     await _setupVm.CheckUpdatesAsync();
@@ -131,7 +139,9 @@ public partial class App : Application
         else
         {
             if (_focusWindow is null) CreateFocusWindow().Show();
+            _programmaticClose = true;
             foreach (var w in _meterWindows.Values.ToList()) w.Close();
+            _programmaticClose = false;
         }
     }
 
@@ -141,8 +151,11 @@ public partial class App : Application
         if (!PerMeter) return;
         foreach (var m in _manager.Meters)
             if (!_meterWindows.ContainsKey(m.Id)) CreateMeterWindow(m).Show();
+        // Programmatic: dropping one removed meter's window must not cascade-close the others.
+        _programmaticClose = true;
         foreach (var id in _meterWindows.Keys.Where(id => _manager.Meters.All(m => m.Id != id)).ToList())
             _meterWindows[id].Close();
+        _programmaticClose = false;
     }
 
     public void NotifyMainWindowClosing(MainWindow w)
@@ -160,6 +173,16 @@ public partial class App : Application
             {
                 if (!_manager.IsSimulated) { var c = ConfigFor(id); c.WinX = w.Position.X; c.WinY = w.Position.Y; }
                 _meterWindows.Remove(id);
+
+                // Per-meter windows are one logical app view — a user closing any one closes the rest
+                // (and, via OnLastWindowClose, exits) rather than leaving orphans with no way to reopen.
+                // Skipped for our own programmatic closes (removing a single meter, switching modes).
+                if (PerMeter && !_programmaticClose)
+                {
+                    _programmaticClose = true;
+                    foreach (var other in _meterWindows.Values.ToList()) other.Close();
+                    _programmaticClose = false;
+                }
             }
         }
         SaveConfig();
@@ -192,6 +215,7 @@ public partial class App : Application
     /// <summary>Close every window so the staged update helper can swap the executable and relaunch.</summary>
     public void ExitForUpdate()
     {
+        _programmaticClose = true;   // every window is closing anyway; don't run the per-meter cascade
         foreach (var w in AllWindows().ToList()) w.Close();
     }
 

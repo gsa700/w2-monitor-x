@@ -43,7 +43,7 @@ public sealed class SetupViewModel : ViewModelBase
         AlarmUpCommand = new RelayCommand(() => SelectedRow?.Meter.AlarmTripUp(), () => CanControl);
         AlarmLockCommand = new RelayCommand(() => SelectedRow?.Meter.ToggleAlarmLock(), () => CanControl);
         ResetAlarmCommand = new RelayCommand(() => SelectedRow?.Meter.ResetAlarm(), () => CanControl);
-        ResetPeakCommand = new RelayCommand(() => _manager.Focus?.ResetPeak());
+        ResetPeakCommand = new RelayCommand(() => SelectedRow?.Meter.ResetPeak());
 
         UpdateCommand = new RelayCommand(() => _ = UpdateButtonAsync(), () => !_updateBusy);
         OpenReleaseCommand = new RelayCommand(OpenRelease);
@@ -260,6 +260,16 @@ public sealed class SetupViewModel : ViewModelBase
     public string UpdateButtonLabel => UpdateAvailable ? "Update now" : "Check for updates";
 
     private Task UpdateButtonAsync() => UpdateAvailable ? UpdateNowAsync() : CheckUpdatesAsync();
+
+    /// <summary>
+    /// Surface that the previous update's file swap failed (the apply helper dropped its marker and
+    /// relaunched the old build). Called at startup so the user isn't left thinking they upgraded.
+    /// </summary>
+    public void NoteUpdateFailed()
+    {
+        UpdateStatus = $"Last update didn't apply — still on {UpdateService.CurrentVersion}. Try again.";
+        UpdateStatusBrush = Palette.AmberBrush;
+    }
 
     public async Task CheckUpdatesAsync()
     {
