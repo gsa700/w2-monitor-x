@@ -7,8 +7,15 @@ namespace W2.Core;
 /// </summary>
 public static class SerialErrors
 {
-    public static string Describe(Exception ex, string port, bool isLinux)
+    public static string Describe(Exception ex, string port, bool isLinux, bool reconnecting = false)
     {
+        // A transient access error mid-reconnect just means the device is still re-enumerating after a
+        // replug (on Linux udev hasn't re-applied the 'dialout' perms yet; on Windows the old handle is
+        // still tearing down) — not a real permissions problem. Skip the alarming dialout / "another app"
+        // hint and show a calm status; a genuine first-connect denial (reconnecting: false) still gets it.
+        if (reconnecting && ex is UnauthorizedAccessException)
+            return $"{port} reconnecting…";
+
         return ex switch
         {
             UnauthorizedAccessException when isLinux =>

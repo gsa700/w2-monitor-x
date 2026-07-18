@@ -43,6 +43,8 @@ public sealed class SerialReader : IReadingSource
     private Thread? _thread;
     private volatile bool _running;
     private volatile bool _linkFaulted;   // set when a query hits a hard port error (device gone)
+    private volatile bool _everConnected; // true once a session has connected since Start(): a later
+                                          // open failure is a reconnect, not a first-time setup problem
     private bool? _pep;
     private bool? _search;
     private bool? _alarmLock;      // SWR-alarm locking mode (A command)
@@ -64,6 +66,7 @@ public sealed class SerialReader : IReadingSource
         _search = null;
         _alarmLock = null;
         _alarmTrip = null;
+        _everConnected = false;
         while (_cmds.TryDequeue(out _)) { }
         _stop.Reset();
         _running = true;
@@ -164,8 +167,7 @@ public sealed class SerialReader : IReadingSource
         }
         if (openError is not null)
         {
-            if (_running) StatusChanged?.Invoke(
-                SerialErrors.Describe(openError, portName, OperatingSystem.IsLinux()) + " Retrying…", true);
+            if (_running) StatusChanged?.Invoke(DescribeRetry(openError, portName), true);
             return;
         }
         if (port is null) return;   // completed without error but no port (shouldn't happen); retry
@@ -175,6 +177,7 @@ public sealed class SerialReader : IReadingSource
         {
             if (_stop.Wait(SettleMs)) return;  // stop requested while settling
             try { port.DiscardInBuffer(); } catch { /* non-fatal */ }
+            _everConnected = true;
             StatusChanged?.Invoke($"Connected on {portName}", false);
             ProbeToggleStates();
 
@@ -197,13 +200,25 @@ public sealed class SerialReader : IReadingSource
         }
         catch (Exception ex) when (_running)
         {
-            StatusChanged?.Invoke(
-                SerialErrors.Describe(ex, portName, OperatingSystem.IsLinux()) + " Retrying…", true);
+            StatusChanged?.Invoke(DescribeRetry(ex, portName), true);
         }
         finally
         {
             ClosePort();   // always release the fd — a dropped device must not leave a dangling handle
         }
+    }
+
+    /// <summary>
+    /// Describe an open/session error for the status line. Once we've connected at least once this
+    /// session (<see cref="_everConnected"/>), a transient access error is a mid-replug re-enumeration,
+    /// so <see cref="SerialErrors.Describe"/> returns a calm "…reconnecting…" that already implies a
+    /// retry — don't double the cue. Anything else keeps the explicit " Retrying…" suffix.
+    /// </summary>
+    private string DescribeRetry(Exception ex, string portName)
+    {
+        var msg = SerialErrors.Describe(ex, portName, OperatingSystem.IsLinux(), reconnecting: _everConnected);
+        var calm = _everConnected && ex is UnauthorizedAccessException;
+        return calm ? msg : msg + " Retrying…";
     }
 
     /// <summary>Send any queued commands, capturing echoes to track Avg-PEP / Search / alarm state.</summary>

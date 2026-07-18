@@ -4,12 +4,18 @@ Dogfooding feedback and small improvements, batched into releases.
 
 ## Open
 
-- **Reconnect status wording.** During a replug the transient "Permission denied … add to
-  dialout" message can flash for ~1 s before the new port resolves (the device is mid-re-enum,
-  not a real permissions problem). Consider suppressing the dialout hint while actively
-  reconnecting so it doesn't alarm users. (Seen during the CM5 forced-drop test, v0.3.3-beta.)
+_(nothing open)_
 
 ## Done
+
+- **Reconnect status wording — suppress the transient dialout flash** (v0.4.1-beta) — during a
+  replug the mid-re-enumeration open would throw `UnauthorizedAccessException` and surface the full
+  "Permission denied … sudo usermod -aG dialout" hint for ~1 s, alarming users over a non-problem.
+  The reader now tracks whether a session has connected at least once (`_everConnected`); once it
+  has, `SerialErrors.Describe(reconnecting: true)` returns a calm `"{port} reconnecting…"` and drops
+  the dialout / "another app" hint. A genuine first-connect denial still gets the full guidance.
+  (`SerialErrors`, `SerialReader.DescribeRetry`.)
+
 
 - **Auto-reconnect / follow-the-cable on Linux after a USB drop or renumber** (v0.3.3-beta) —
   the reader now detects a lost link (`LinkHealth`), releases the fd, and reconnects by
