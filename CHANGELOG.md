@@ -3,6 +3,17 @@
 Cross-platform **W2 Monitor** (.NET 8 + Avalonia). Companion to the original PowerShell
 app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
+## [0.4.0-beta] - 2026-07-17
+
+### Fixed
+- **In-app update no longer crashes on launch.** Release builds are now a TRUE single-file exe
+  with the native libraries (Skia/HarfBuzz/ANGLE) bundled *inside* it. Previously the publish
+  shipped those DLLs loose beside the exe; since the in-app updater replaces only the exe, an
+  updated build landed with no native dependencies and crashed on startup. The
+  `IncludeNativeLibrariesForSelfExtract` setting is now baked into the project file so the
+  documented publish command can't miss it. Updating from an earlier build repairs itself — the
+  new self-contained exe no longer needs the loose DLLs. (Same failure that broke LP-100A v0.9.4.)
+
 ## [0.3.8-beta] - 2026-07-12
 
 ### Added
