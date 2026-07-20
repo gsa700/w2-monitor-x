@@ -10,7 +10,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <AssemblyName>W2Monitor</AssemblyName>
-    <Version>0.4.1-beta</Version>
+    <Version>0.5.0-beta</Version>
     <Product>W2 Monitor</Product>
     <Authors>David Erickson (AB0R)</Authors>
     <ApplicationIcon>Assets/app.ico</ApplicationIcon>

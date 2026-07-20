@@ -5,6 +5,8 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+## [0.5.0-beta] - 2026-07-20
+
 ### Changed
 - **Retargeted from .NET 8 to .NET 10 (LTS).** .NET 8 reaches end of support on 2026-11-10; .NET 10
   is supported through November 2028. The self-contained builds now bundle the .NET 10 runtime, so
@@ -39,7 +41,7 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
   NuGet-audit, and package-resolution behavior can't silently differ between them — the exact class
   of drift that let the D-Bus CVE above go unreported. Pinned to 10 rather than 8 on purpose: the
   .NET 8 SDK would switch transitive auditing back off. The Pi and Fedora boxes need the .NET 10 SDK
-  installed before their next build (the same prerequisite as the eventual `net10` retarget).
+  installed before their next build (the same prerequisite as the `net10` retarget in this release).
 
 ## [0.4.1-beta] - 2026-07-17
 
