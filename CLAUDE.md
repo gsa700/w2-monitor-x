@@ -1,7 +1,7 @@
 # W2 Monitor (w2-monitor-x)
 
 Cross-platform desktop monitor for **Elecraft W2** RF power/SWR meters — multi-meter,
-full W2 control, TX-timeout timer, SWR alarm. **.NET 8 + Avalonia 11.2.1**, MVVM.
+full W2 control, TX-timeout timer, SWR alarm. **.NET 10 + Avalonia 11.2.1**, MVVM.
 Runs on Windows, Linux, and Raspberry Pi (arm64). GPLv3. By David Erickson (AB0R).
 
 This is the cross-platform successor to the retired PowerShell `w2-monitor`. It is the
@@ -10,7 +10,7 @@ sole, ongoing W2 Monitor line — all W2 work happens here.
 ## Build / run / test
 
 ```sh
-dotnet build                                   # needs the .NET 8 SDK
+dotnet build                                   # needs the .NET 10 SDK (pinned in global.json)
 dotnet run --project src/W2.App                # run the app (needs a desktop/DISPLAY)
 dotnet run --project src/W2.App -- --sim       # no hardware: drive UI from synthetic W2s
 dotnet run --project src/W2.App -- --setup     # open Setup on launch (debug)

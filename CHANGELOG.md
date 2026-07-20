@@ -1,9 +1,15 @@
 # Changelog
 
-Cross-platform **W2 Monitor** (.NET 8 + Avalonia). Companion to the original PowerShell
+Cross-platform **W2 Monitor** (.NET 10 + Avalonia). Companion to the original PowerShell
 app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
+
+### Changed
+- **Retargeted from .NET 8 to .NET 10 (LTS).** .NET 8 reaches end of support on 2026-11-10; .NET 10
+  is supported through November 2028. The self-contained builds now bundle the .NET 10 runtime, so
+  users still install nothing — the change is transparent at runtime. Verified on Windows and on the
+  Raspberry Pi CM5 (linux-arm64); build clean, 113/113 tests, all three RIDs publish and run.
 
 ### Security
 - **Linux/Pi: patched a high-severity D-Bus vulnerability** ([CVE-2026-39959], CVSS 7.1). Avalonia's

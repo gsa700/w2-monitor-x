@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
@@ -48,8 +48,8 @@
          0.21.3 is the patched release on the same 0.2x line — do NOT jump to 0.9x, that's
          past a versioning discontinuity and changes API Avalonia calls into.
          Drop this once Avalonia's own floor moves above 0.21.3.
-         Note: net8.0 audits only DIRECT packages, so the build stayed silent about this;
-         net9.0+ audits transitively and reports it. -->
+         Note: this went unreported until the build moved to the .NET 10 SDK — the .NET 8 SDK
+         that originally shipped it audits only DIRECT packages; .NET 9+ audits transitively. -->
     <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
   </ItemGroup>
 

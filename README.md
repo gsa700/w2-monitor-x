@@ -2,7 +2,7 @@
 
 A modern, dark-themed desktop monitor for **Elecraft W2** RF power / SWR meters —
 multi-meter, full W2 control, and a transmit-timeout timer — for **Windows, Linux, and
-Raspberry Pi**. Built with .NET 8 + Avalonia.
+Raspberry Pi**. Built with .NET 10 + Avalonia.
 
 [![Release](https://img.shields.io/github/v/release/gsa700/w2-monitor-x?include_prereleases&color=orange)](https://github.com/gsa700/w2-monitor-x/releases)
 [![License](https://img.shields.io/github/license/gsa700/w2-monitor-x?color=blue)](LICENSE)
@@ -85,7 +85,7 @@ Then click **Setup**, add your W2's port (or **Detect**), and **Connect**.
 ## Build from source
 
 ```sh
-dotnet build                                   # requires the .NET 8 SDK
+dotnet build                                   # requires the .NET 10 SDK
 dotnet run --project src/W2.App                # run
 dotnet run --project src/W2.App -- --sim       # no hardware? drive it from a synthetic meter
 dotnet test                                    # run the test suite

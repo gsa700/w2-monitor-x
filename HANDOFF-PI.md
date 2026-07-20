@@ -25,7 +25,7 @@ suspect; treat the Windows-validated logic (below) as trustworthy.
 
 ```sh
 git clone https://github.com/gsa700/w2-monitor-x && cd w2-monitor-x
-dotnet build                                   # needs the .NET 8 SDK
+dotnet build                                   # needs the .NET 10 SDK
 dotnet test                                    # 78 tests, all pure Core logic — should pass on ARM
 dotnet run --project src/W2.App                # the app (needs a desktop/DISPLAY)
 dotnet run --project src/W2.App -- --sim       # UI from a synthetic meter, no hardware
@@ -87,7 +87,7 @@ tool (this is how the Windows serial paths were validated).
 `/tmp/probe/probe.csproj`:
 ```xml
 <Project Sdk="Microsoft.NET.Sdk"><PropertyGroup>
-  <OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework>
+  <OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework>
   <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
 </PropertyGroup><ItemGroup>
   <ProjectReference Include="/absolute/path/to/w2-monitor-x/src/W2.Core/W2.Core.csproj" />
