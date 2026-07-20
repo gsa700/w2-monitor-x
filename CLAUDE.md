@@ -75,9 +75,25 @@ Each W2 is followed by its USB chip serial: FTDI serial pinning on **Windows** (
 
 ## Hardware & workflow notes
 
-- **The dev/build machine (this Windows box) usually has NO W2 attached.** The two physical W2s
-  live on **HAMSTATION** (the shack PC), which downloads releases and does on-air dogfooding.
-  Use `--sim` here; don't expect COM ports.
+- **Both W2s are attached to this Windows box** (verified 2026-07-19) — live hardware testing
+  works here. `--sim` is still the way to work without touching the rig. On-air dogfooding of
+  releases happens at the station. *(An earlier version of this note said this box had no W2
+  attached and that both lived on HAMSTATION — no longer true here.)*
+- **Identify every USB adapter by its chip serial, never by COM port.** Ports renumber; all of
+  them changed across a clean Windows 11 reinstall on 2026-07-19. Every FT232R here reports
+  stock EEPROM (`USB Serial Converter`, no programmed product name), so nothing in Windows
+  tells them apart by inspection — this table is the only mapping:
+
+  | Chip serial | Device |
+  |---|---|
+  | `A10KMB4VA` | Elecraft W2 #1 |
+  | `AG0JFX7UA` | Elecraft W2 #2 |
+  | `ABSCDI99A` | TelePost LP-100A |
+  | `AD0JLU2FA` | Kenwood TM-V71A |
+  | FT2232 dual-channel (`PID_6010`, two ports) | Elecraft K4D |
+
+  **Never run Detect to work out which adapter is which** — it sends `V` and may key a radio,
+  and two of these are transmitters. Read the table, or ask.
 - Cross-platform validated on real hardware: **Windows, Pi CM5 (linux-arm64), Fedora (linux-x64)**.
 - A Pi-side Claude session has worked this repo too (`HANDOFF-PI.md`); the two boxes sync via git
   (`main`, two-way pull/push). Keep `main` clean and rebased-friendly.
