@@ -13,12 +13,27 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
   `linux-x64` and `linux-arm64` (Raspberry Pi) builds only — Windows doesn't use D-Bus. The pin can
   be dropped once Avalonia's own floor moves past 0.21.3. (`W2.App.csproj`.)
 
-  Worth noting how this hid: a `net8.0` target audits only *direct* NuGet packages, so the build
-  reported nothing. `net9.0`+ audits transitively and flags it. Avalonia 11.2.1 was pinned in the
-  Phase 0 scaffold and never bumped, so every release to date — 0.2.0-alpha through 0.4.1-beta —
-  shipped the vulnerable version on Linux.
+  Worth noting how this hid: the **.NET 8 SDK** audits only *direct* NuGet packages, so the build
+  reported nothing; the **.NET 9+ SDK** audits transitively and flags it. (It's the SDK that
+  decides, not the target framework — building the same `net8.0` source with the .NET 10 SDK is
+  what surfaced it.) Avalonia 11.2.1 was pinned in the Phase 0 scaffold and never bumped, so every
+  release to date — 0.2.0-alpha through 0.4.1-beta — shipped the vulnerable version on Linux.
 
 [CVE-2026-39959]: https://github.com/advisories/GHSA-xrw6-gwf8-vvr9
+
+### Added
+- **The Elecraft W2 reference PDFs now live in `docs/`** — the owner's manual, the serial interface
+  command reference, and the power-on mod. These are the primary sources the `W2.Core` protocol
+  layer was built from; they were previously outside the repo, unconnected to the code implementing
+  them.
+
+### Build
+- **Pinned the build SDK to .NET 10 via `global.json`** (`rollForward: latestMinor`). All three
+  build machines (Windows, Raspberry Pi CM5, Fedora) now use the same SDK major, so analyzer,
+  NuGet-audit, and package-resolution behavior can't silently differ between them — the exact class
+  of drift that let the D-Bus CVE above go unreported. Pinned to 10 rather than 8 on purpose: the
+  .NET 8 SDK would switch transitive auditing back off. The Pi and Fedora boxes need the .NET 10 SDK
+  installed before their next build (the same prerequisite as the eventual `net10` retarget).
 
 ## [0.4.1-beta] - 2026-07-17
 
