@@ -3,6 +3,23 @@
 Cross-platform **W2 Monitor** (.NET 8 + Avalonia). Companion to the original PowerShell
 app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
+## [Unreleased]
+
+### Security
+- **Linux/Pi: patched a high-severity D-Bus vulnerability** ([CVE-2026-39959], CVSS 7.1). Avalonia's
+  Linux backend pulled in `Tmds.DBus.Protocol` 0.20.0 transitively, where a malicious D-Bus peer on
+  the same session could spoof signals by impersonating name owners, exhaust file descriptors, or
+  crash the app with a malformed message body. Now pinned to the patched 0.21.3. Affects the
+  `linux-x64` and `linux-arm64` (Raspberry Pi) builds only — Windows doesn't use D-Bus. The pin can
+  be dropped once Avalonia's own floor moves past 0.21.3. (`W2.App.csproj`.)
+
+  Worth noting how this hid: a `net8.0` target audits only *direct* NuGet packages, so the build
+  reported nothing. `net9.0`+ audits transitively and flags it. Avalonia 11.2.1 was pinned in the
+  Phase 0 scaffold and never bumped, so every release to date — 0.2.0-alpha through 0.4.1-beta —
+  shipped the vulnerable version on Linux.
+
+[CVE-2026-39959]: https://github.com/advisories/GHSA-xrw6-gwf8-vvr9
+
 ## [0.4.1-beta] - 2026-07-17
 
 ### Fixed

@@ -41,6 +41,19 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Security pin, NOT a feature dependency. Avalonia's Linux backend pulls in
+         Tmds.DBus.Protocol 0.20.0 transitively, which has CVE-2026-39959 (CVSS 7.1): a
+         malicious D-Bus peer can spoof signals, exhaust FDs, or crash us with a malformed
+         body. Affects the linux-x64 / linux-arm64 (Pi) builds; Windows doesn't use D-Bus.
+         0.21.3 is the patched release on the same 0.2x line — do NOT jump to 0.9x, that's
+         past a versioning discontinuity and changes API Avalonia calls into.
+         Drop this once Avalonia's own floor moves above 0.21.3.
+         Note: net8.0 audits only DIRECT packages, so the build stayed silent about this;
+         net9.0+ audits transitively and reports it. -->
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\W2.Core\W2.Core.csproj" />
   </ItemGroup>
 
