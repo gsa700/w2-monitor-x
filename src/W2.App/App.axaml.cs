@@ -212,6 +212,12 @@ public partial class App : Application
                 }
             }
         }
+
+        // Setup is a top-level window, not owned by any of these, so under OnLastWindowClose it would
+        // sit there holding the app open after every main window has gone — visible only as a Setup
+        // window with nothing to configure and a process that never exits. Close it with the last one.
+        if (_focusWindow is null && _meterWindows.Count == 0) _setupWindow?.Close();
+
         SaveConfig();
     }
 

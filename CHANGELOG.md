@@ -5,7 +5,20 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+### Changed
+- **Setup's tabs look like tabs.** Fluent draws them as large underlined text, which against this dark
+  palette read as a row of labels — outlined and rounded now, with the selected one filled and merged
+  into the panel below it, matching LP-100A.
+- **Setup no longer changes height when you switch tabs.** It's fixed at the length of the longest tab
+  plus a little, which costs some empty space at the bottom of the short ones and is much less
+  distracting than a window that jumps every time you click.
+- **The tabs that act on a meter now say which one, and let you change it.** W2 Controls and SWR Alarm
+  each carry a meter picker; it shares its selection with the Meters tab, so the two can't disagree.
+
 ### Fixed
+- **Setup no longer keeps the app alive after you close the main windows.** It's a top-level window, so
+  closing every meter window left it sitting there — with nothing to configure and a process that never
+  exited. It now closes with the last one.
 - **The Windows installed-apps entry repairs itself.** After a clean install of 0.6.0-beta the entry
   was written correctly and then went missing, so the app stopped appearing in Settings → Apps →
   Installed apps — the only route most people have to uninstall it. What removed it is still unknown,

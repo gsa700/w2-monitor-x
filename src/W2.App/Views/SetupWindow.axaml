@@ -3,27 +3,70 @@
         xmlns:vm="using:W2.App.ViewModels"
         x:Class="W2.App.Views.SetupWindow"
         x:DataType="vm:SetupViewModel"
-        Width="460" SizeToContent="Height" MaxHeight="900" CanResize="False"
+        Width="460" Height="520" CanResize="False"
         Background="{StaticResource BgBrush}"
         Icon="/Assets/app.ico"
         Title="W2 Monitor — Setup">
 
+  <Window.Styles>
+    <!-- The meter picker used by the tabs that act on the selected meter. A horizontal ListBox rather
+         than a row of buttons, deliberately: its selection *is* SelectedRow, so this and the Meters
+         tab are one choice that cannot drift apart, with no code to keep them in step. The chrome is
+         restyled to read as buttons — Fluent's own ListBoxItem draws a selection bar down the left
+         edge, which looks like a list, which is what this is trying not to look like. -->
+    <Style Selector="ListBox.picker">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="ItemsPanel">
+        <ItemsPanelTemplate>
+          <StackPanel Orientation="Horizontal" Spacing="6"/>
+        </ItemsPanelTemplate>
+      </Setter>
+      <Setter Property="ItemTemplate">
+        <DataTemplate x:DataType="vm:MeterRow">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <Ellipse Width="8" Height="8" Fill="{Binding DotBrush}" VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding ShortText}" VerticalAlignment="Center"/>
+          </StackPanel>
+        </DataTemplate>
+      </Setter>
+    </Style>
+
+    <Style Selector="ListBox.picker ListBoxItem">
+      <Setter Property="Padding" Value="12,6"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="CornerRadius" Value="4"/>
+    </Style>
+
+    <!-- Reach into the item template: setting Background on the ListBoxItem alone is overridden by
+         Fluent's own pseudo-class styles, which target the presenter. -->
+    <Style Selector="ListBox.picker ListBoxItem /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource BgBrush}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource TrackBrush}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="4"/>
+    </Style>
+
+    <Style Selector="ListBox.picker ListBoxItem:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource TrackBrush}"/>
+    </Style>
+
+    <Style Selector="ListBox.picker ListBoxItem:selected /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+    </Style>
+  </Window.Styles>
+
   <!-- Tabbed rather than one long scroll: the single stack had grown to five sections and every new
        option pushed the window taller. The tab header now names each section, so the in-page
-       ALL-CAPS headings it used to need are gone. Each tab's content sits in a ScrollViewer so the
-       MaxHeight can never clip a control out of reach. Matches LP-100A's Setup. -->
-  <TabControl x:Name="Tabs" Margin="8" SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
+       ALL-CAPS headings it used to need are gone.
 
-    <!-- Fluent styles TabItem headers at 24px, for phone-style pivots. At that size five headers
-         wrap onto a second line here and tower over the 11-13px body text; this brings them into
-         scale with the rest of the window and keeps the strip on one line. -->
-    <TabControl.Styles>
-      <Style Selector="TabItem">
-        <Setter Property="FontSize" Value="14"/>
-        <Setter Property="MinHeight" Value="0"/>
-        <Setter Property="Padding" Value="10,6"/>
-      </Style>
-    </TabControl.Styles>
+       Fixed height, not SizeToContent: the tabs differ enough in length that sizing to each one made
+       the window jump every time you switched, which is worse than the empty space at the bottom of
+       the short tabs. It's set to the longest tab — Meters, with its list at full stretch — plus a
+       small buffer, and every tab's content sits in a ScrollViewer so an unusually long one scrolls
+       rather than losing a control off the bottom. Tab chrome is styled globally in App.axaml. -->
+  <TabControl x:Name="Tabs" Margin="8" SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
 
 
     <!-- ==================== Meters ==================== -->
@@ -87,8 +130,13 @@
       <ScrollViewer>
         <StackPanel Margin="8" Spacing="12">
 
-          <TextBlock Text="Act on the selected meter (must be connected)."
+          <TextBlock Text="These act on the meter selected below (it must be connected)."
                      Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
+
+          <!-- Same SelectedRow the Meters tab binds, so picking here and picking there are one
+               choice, not two that can disagree. -->
+          <ListBox Classes="picker" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                   AutomationProperties.Name="Meter to adjust"/>
 
           <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto">
             <Button Grid.Row="0" Grid.Column="0" Content="Auto Sensor" Command="{Binding SearchCommand}" IsEnabled="{Binding CanControl}" Background="{Binding SearchBrush}" HorizontalAlignment="Stretch" Margin="0,0,3,4"/>
@@ -110,6 +158,10 @@
 
           <TextBlock Text="Trip point sets where the alarm fires — it drives the rear-panel keyline-disconnect relay."
                      Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
+
+          <!-- This tab acts on the selected meter too, so it gets the same picker. -->
+          <ListBox Classes="picker" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                   AutomationProperties.Name="Meter to adjust"/>
 
           <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto">
             <Button Grid.Column="0" Content="▼" Command="{Binding AlarmDownCommand}" IsEnabled="{Binding CanControl}" Width="36"/>

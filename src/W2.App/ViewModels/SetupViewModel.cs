@@ -375,6 +375,13 @@ public sealed class MeterRow : ViewModelBase
     private string _statusText = "";
     public string StatusText { get => _statusText; private set => SetProperty(ref _statusText, value); }
 
+    private string _shortText = "";
+    /// <summary>
+    /// Just the meter's name, for the compact picker on the tabs that act on the selected meter —
+    /// there the port and cable serial would crowd out the controls they sit above.
+    /// </summary>
+    public string ShortText { get => _shortText; private set => SetProperty(ref _shortText, value); }
+
     private IBrush _dotBrush = Palette.DimBrush;
     public IBrush DotBrush { get => _dotBrush; private set => SetProperty(ref _dotBrush, value); }
 
@@ -383,6 +390,7 @@ public sealed class MeterRow : ViewModelBase
         var port = Meter.Port ?? "unassigned";
         var serial = SerialDisplay.Shorten(Meter.Serial);
         Text = serial is null ? $"{Meter.Name}  ·  {port}" : $"{Meter.Name}  ·  {port}  ({serial})";
+        ShortText = Meter.Name;
         StatusText = Meter.Status;
         DotBrush = Meter.StatusIsError ? Palette.RedBrush
             : Meter is { IsConnected: true, Current: not null } ? Palette.GreenBrush
