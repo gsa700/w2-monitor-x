@@ -5,6 +5,14 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+## [0.6.0-beta] - 2026-07-30
+
+Two new features and a major dependency jump. **The Linux and Raspberry Pi side of the installer has
+never run on real hardware** — it compiles, cross-publishes, and its pure logic is unit-tested, but no
+part of its filesystem work (icon, `.desktop` entry, symlink, `chmod`, the uninstall trampoline) has
+executed on a Linux box. On Linux, treat this release as the thing that finds that out. Windows is
+verified end to end.
+
 ### Added
 - **Setup is tabbed** — Meters / W2 Controls / SWR Alarm / Display / Updates, matching LP-100A Monitor.
   The single stack had grown long enough that every new option pushed the window taller, and the
