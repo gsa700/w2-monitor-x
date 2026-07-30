@@ -5,6 +5,32 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+### Fixed
+- **A reader fault can no longer take the app down with it.** `Supervise` ran without a `catch`, so an
+  exception on that background thread was unhandled — which in .NET means the whole process exits. The
+  reachable trigger: `Stop()`'s 3 s join times out on a wedged session, `Dispose()` disposes the stop
+  event underneath the still-running loop, and its next `Wait()` throws. Waits now treat a disposed
+  event as "stop", a catch-all guarantees nothing escapes the thread whatever the cause, and a throwing
+  `StatusChanged` subscriber can't do it either. (`SerialReader`.)
+- **A malformed F reply no longer drops the connection.** The connect-time state probe carried its own
+  copy of the forward-power format, unanchored and using `long.Parse` where the rest of the codebase
+  uses `TryParse` — so an overlong digit run threw, and the throw surfaced as a session teardown and
+  reconnect. The copy is gone; it now decodes through `W2FrameParser`, the same anchored decoder the
+  poll loop uses. (`SerialReader.ProbeToggleStates`.)
+- **A long serial no longer reports a cable identity it doesn't have.** In the Setup meter list, the
+  leading "…" means "serial extracted from a long `/dev/serial/by-id` name" and a trailing one means
+  "truncated" — but both came from a single condition, so an over-length raw serial displayed as
+  `…VERYLONGS…`, implying a Linux by-id extraction that never took place. (`SerialDisplay.Shorten`.)
+- **Peak-hold marker and alarm flash edge cases.** The marker could be drawn at a negative offset when
+  the control is narrower than the marker itself, and the alarm flash didn't resume if the bar was
+  re-parented mid-alarm. Neither is reachable in the current window layout. (`PowerSwrBar`.)
+
+### Internal
+- `SerialReader` gained its first unit tests — 6 lifecycle checks that need no serial port — and
+  `Dispose` is now explicitly idempotent. That last one was hygiene, not a fix: repeat disposal was
+  already harmless, since the underlying event tolerates both double-`Dispose` and post-`Dispose`
+  `Set()`. 125 tests pass.
+
 ## [0.5.1-beta] - 2026-07-29
 
 Three fixes from the 2026-07-17 bug hunt, closing out that batch. No feature or protocol changes.

@@ -35,7 +35,6 @@ public sealed class SerialReader : IReadingSource
     private static readonly Regex NEcho = new(@"[Nn]([AP])", RegexOptions.Compiled);
     private static readonly Regex YEcho = new(@"[Yy]([01])", RegexOptions.Compiled);
     private static readonly Regex AEcho = new(@"[Aa]([01])", RegexOptions.Compiled);
-    private static readonly Regex FwdRf = new(@"[Ff](\d+)D(\d)", RegexOptions.Compiled);
 
     private readonly ConcurrentQueue<char> _cmds = new();
     private readonly ManualResetEventSlim _stop = new(false);  // signalled by Stop(); also wakes backoff waits
@@ -45,6 +44,7 @@ public sealed class SerialReader : IReadingSource
     private volatile bool _linkFaulted;   // set when a query hits a hard port error (device gone)
     private volatile bool _everConnected; // true once a session has connected since Start(): a later
                                           // open failure is a reconnect, not a first-time setup problem
+    private int _disposed;                // 0/1 via Interlocked — makes Dispose() idempotent
     private bool? _pep;
     private bool? _search;
     private bool? _alarmLock;      // SWR-alarm locking mode (A command)
@@ -61,6 +61,7 @@ public sealed class SerialReader : IReadingSource
 
     public void Start(string portName, Func<string?>? resolvePort = null)
     {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         Stop();
         _pep = null;
         _search = null;
@@ -81,7 +82,8 @@ public sealed class SerialReader : IReadingSource
     public void Stop()
     {
         _running = false;
-        _stop.Set();                       // wake any backoff/poll wait immediately
+        // Set() happens to tolerate a disposed event today; don't rely on that from a shutdown path.
+        try { _stop.Set(); } catch (ObjectDisposedException) { /* nothing left to wake */ }
         try { _thread?.Join(3000); } catch { /* ignore */ }
         _thread = null;
         ClosePort();
@@ -122,19 +124,46 @@ public sealed class SerialReader : IReadingSource
                 var port = SafeResolve(resolvePort) ?? portName;
                 RunSession(port);
                 if (!_running) break;
-                if (_stop.Wait(ReconnectDelayMs)) break;   // Stop() during backoff → exit
+                if (WaitForStop(ReconnectDelayMs)) break;   // Stop() during backoff → exit
             }
+        }
+        catch (Exception ex)
+        {
+            // Nothing may escape this thread: an unhandled exception on a background thread tears down
+            // the whole process, so a reader fault would take the app with it. The realistic trigger is
+            // Stop()'s 3 s join timing out on a wedged session, after which Dispose() disposes _stop
+            // while this loop is still going — but a throwing StatusChanged subscriber would do it too.
+            Report($"{portName} reader stopped unexpectedly: {ex.Message}", true);
         }
         finally
         {
             ClosePort();
-            if (!_running) StatusChanged?.Invoke("Disconnected", false);
+            if (!_running) Report("Disconnected", false);
         }
     }
 
     private static string? SafeResolve(Func<string?>? resolvePort)
     {
         try { return resolvePort?.Invoke(); } catch { return null; }
+    }
+
+    /// <summary>
+    /// Raise <see cref="StatusChanged"/> without letting a subscriber's exception escape the reader
+    /// thread — see the catch in <see cref="Supervise"/> for why that matters.
+    /// </summary>
+    private void Report(string message, bool isError)
+    {
+        try { StatusChanged?.Invoke(message, isError); } catch { /* subscriber's problem, not ours */ }
+    }
+
+    /// <summary>
+    /// Wait on the stop signal, treating a disposed event as "stop now". <see cref="Stop"/>'s join can
+    /// time out on a wedged session and <see cref="Dispose"/> then disposes <c>_stop</c> underneath this
+    /// thread; without this the wait would throw and, before the catch above, crash the process.
+    /// </summary>
+    private bool WaitForStop(int milliseconds)
+    {
+        try { return _stop.Wait(milliseconds); } catch (ObjectDisposedException) { return true; }
     }
 
     /// <summary>
@@ -218,7 +247,7 @@ public sealed class SerialReader : IReadingSource
 
         try
         {
-            if (_stop.Wait(SettleMs)) return;  // stop requested while settling
+            if (WaitForStop(SettleMs)) return;  // stop requested while settling
             try { port.DiscardInBuffer(); } catch { /* non-fatal */ }
             _everConnected = true;
             StatusChanged?.Invoke($"Connected on {portName}", false);
@@ -235,7 +264,7 @@ public sealed class SerialReader : IReadingSource
                 if (_linkFaulted) health.Fault();
                 ReadingReceived?.Invoke(W2FrameParser.Build(f, r, s, i)
                     with { Pep = _pep, Search = _search, AlarmLock = _alarmLock, AlarmTrip = _alarmTrip });
-                if (_stop.Wait(PollIntervalMs)) break;
+                if (WaitForStop(PollIntervalMs)) break;
             }
 
             if (_running && (health.IsLost || _linkFaulted))
@@ -288,10 +317,10 @@ public sealed class SerialReader : IReadingSource
     /// </summary>
     private void ProbeToggleStates()
     {
-        var fr = Query('F');
-        var rf = fr is not null && FwdRf.Match(fr) is { Success: true } m
-                 && long.Parse(m.Groups[1].Value) / Math.Pow(10, m.Groups[2].Value[0] - '0') > 0.5;
-        if (rf) return;
+        // Decode through W2FrameParser rather than a second copy of the F-reply format: it anchors the
+        // match and uses TryParse, where the copy that used to live here was unanchored and would throw
+        // on an overlong digit run — inside RunSession's try, so a junk frame became a session teardown.
+        if (W2FrameParser.Power(Query('F')) is > 0.5) return;
 
         Query('N');
         if (Query('N') is { } n && NEcho.Match(n) is { Success: true } nm) _pep = nm.Groups[1].Value == "P";
@@ -355,6 +384,9 @@ public sealed class SerialReader : IReadingSource
 
     public void Dispose()
     {
+        // Idempotent by construction. Repeat disposal was harmless before only because _stop's own
+        // Dispose() is idempotent — not a property to leave load-bearing as fields get added here.
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         Stop();
         _stop.Dispose();
     }

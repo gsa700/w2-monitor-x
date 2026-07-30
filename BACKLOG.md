@@ -13,13 +13,32 @@ From the 2026-07-17 bug hunt — real findings not fixed in the 0.4.1 batch:
   could then capture the display), and if the release feels sluggish when you swap antennas between
   overs, the switch paths rather than this constant are what to look at. Adjust the constructor
   default if either shows up. (`SensorLock`.)
-- **Minor hardening (latent / low):** `SerialReader.Dispose` isn't idempotent and an unhandled
-  exception can escape the supervisor thread if `Stop()`'s 3 s join times out; `ProbeToggleStates`
-  uses an unanchored regex + `long.Parse` (vs `TryParse` elsewhere); `SerialDisplay.Shorten`
-  prepends a misleading "…" to over-length raw serials; `PowerSwrBar` marker-x can go negative /
-  flash timer won't restart if the control is ever re-parented (not reachable in the current layout).
 
 ## Done
+
+- **Minor hardening cluster** (unreleased) — five latent items, and checking them turned up that they
+  were not equally real:
+  - *Escaping exception on the supervisor thread — real, and the serious one.* `_stop.Wait()` throws
+    `ObjectDisposedException` once `_stop` is disposed, `Supervise` had no `catch`, and an unhandled
+    exception on a background thread tears down the process. Reachable when `Stop()`'s 3 s join times
+    out on a wedged session and `Dispose()` then disposes the event under the still-running loop. Now
+    `WaitForStop` treats disposal as "stop", with a catch-all so nothing escapes for any other reason
+    either, and `Report` keeps a throwing `StatusChanged` subscriber from doing the same.
+  - *`ProbeToggleStates` parsing — real.* Unanchored regex plus `long.Parse` (`TryParse` everywhere
+    else), so an overlong digit run threw inside `RunSession`'s try → spurious session teardown and
+    reconnect. Deleted the duplicate regex and decoded via `W2FrameParser.Power` instead, which is
+    anchored, uses `TryParse`, and is the same decoder the poll loop already trusts.
+  - *`SerialDisplay.Shorten` — real.* Leading and trailing "…" shared one condition, so a plain
+    over-length raw serial rendered as `…VERYLONGS…`, claiming a by-id extraction that never happened.
+    The two marks are now decided independently.
+  - *`PowerSwrBar` — real but unreachable in the current layout.* Marker-x went negative when the
+    control is narrower than the 3 px marker (narrow the marker, then clamp), and the flash timer
+    didn't resume if the control was re-parented mid-alarm (restart it in `OnAttachedToVisualTree`).
+  - *`Dispose` idempotency — **not** a live bug.* Repeat `Dispose`/`Stop` never threw: `_stop`'s own
+    `Dispose()` is idempotent and its `Set()` tolerates post-disposal calls (both verified). Guarded
+    explicitly anyway so that stays true as fields are added, but it fixed nothing observable.
+
+  `SerialReader` also picked up its first tests — 6 hardware-free lifecycle checks. 125 pass (+8).
 
 - **SensorLock released on any sub-threshold dip** (unreleased) — `Accept` dropped the lock the instant
   the locked sampler read ≤ 0.5 W, but SSB/CW power dips below that *within* an over (syllables, CW

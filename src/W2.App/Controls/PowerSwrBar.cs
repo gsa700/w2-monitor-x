@@ -83,6 +83,14 @@ public sealed class PowerSwrBar : Control
         }
     }
 
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        // Detaching stops the timer, and only an Alarm *change* restarts it — so a control re-parented
+        // while the alarm is still up would show a static red instead of flashing. Resume it here.
+        if (Alarm) { _flashOn = true; _flashTimer.Start(); }
+    }
+
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         _flashTimer.Stop();
@@ -115,8 +123,11 @@ public sealed class PowerSwrBar : Control
             var pk = Fraction(HeldPeak, Max);
             if (pk > 0)
             {
-                var x = Math.Min(w - MarkerWidth, Math.Max(0, w * pk - MarkerWidth / 2));
-                ctx.FillRectangle(Palette.CyanBrush, new Rect(x, y, MarkerWidth, PowerHeight));
+                // Narrow the marker before clamping: at a width under MarkerWidth, clamping x to
+                // w - MarkerWidth would put it at a negative offset and draw outside the control.
+                var mw = Math.Min(MarkerWidth, w);
+                var x = Math.Clamp(w * pk - mw / 2, 0, w - mw);
+                ctx.FillRectangle(Palette.CyanBrush, new Rect(x, y, mw, PowerHeight));
             }
             y += PowerHeight + Gap;
         }
