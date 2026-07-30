@@ -26,7 +26,7 @@ suspect; treat the Windows-validated logic (below) as trustworthy.
 ```sh
 git clone https://github.com/gsa700/w2-monitor-x && cd w2-monitor-x
 dotnet build                                   # needs the .NET 10 SDK
-dotnet test                                    # 78 tests, all pure Core logic — should pass on ARM
+dotnet test                                    # 117 tests, all pure Core logic — should pass on ARM
 dotnet run --project src/W2.App                # the app (needs a desktop/DISPLAY)
 dotnet run --project src/W2.App -- --sim       # UI from a synthetic meter, no hardware
 ```
@@ -123,13 +123,34 @@ Also just inspect the environment directly: `ls -l /dev/serial/by-id/`, `ls /dev
 
 - **Version** lives in `src/W2.App/W2.App.csproj` (`<Version>`). Bump it + add a `CHANGELOG.md`
   entry per release. Versions < 1.0 are `-beta` ("in use, not broadly field-tested").
-- **Release recipe:** `dotnet test` → publish 3 RIDs self-contained single-file
-  (`win-x64`, `linux-x64`, `linux-arm64`) → zip each as `W2Monitor-<rid>.zip` → commit →
-  `git tag -a vX.Y.Z-beta` → `git push origin main --follow-tags` →
-  `gh release create vX.Y.Z-beta <zips> --title … --latest`. **Use `--latest`, NOT
-  `--prerelease`** — the in-app updater queries `/releases/latest`, which skips pre-releases.
+- **Release recipe** — the order matters; see the two notes under it:
+  1. `dotnet test` — all green before anything else.
+  2. Bump `<Version>` in `src/W2.App/W2.App.csproj`, date the `CHANGELOG.md` section, and **commit
+     that before publishing.**
+  3. Publish 3 RIDs self-contained single-file (`win-x64`, `linux-x64`, `linux-arm64`), then zip each
+     as `W2Monitor-<rid>.zip` — those exact asset names are what the updater matches on.
+  4. **Smoke-test a published binary before uploading it.** Launch it with `--sim`, pointing
+     `APPDATA` (Windows) or `XDG_CONFIG_HOME`/`HOME` (Linux) at a throwaway dir so it can't touch the
+     live `config.json`; confirm it's still alive several seconds later.
+  5. `git tag -a vX.Y.Z-beta` → `git push origin main --follow-tags`.
+  6. `gh release create vX.Y.Z-beta <zips> --title … --latest`. **Use `--latest`, NOT
+     `--prerelease`** — the in-app updater queries `/releases/latest`, which skips pre-releases.
+  7. Verify what the updater will actually see, rather than assuming:
+     `curl -s https://api.github.com/repos/gsa700/w2-monitor-x/releases/latest` must report the new
+     tag and all three asset names.
+
+  **Why the bump is committed first (step 2 before step 3):** the informational version embeds the
+  current commit sha, so publishing before committing stamps the binaries with the commit *preceding*
+  the bump — a sha that is not the release tag, which misleads anyone tracing a field report back to
+  source. Releases through v0.5.0-beta carry that skew; v0.5.1-beta onward don't.
+
+  **Why step 4 exists:** single-file bundling only applies on publish with a RID — `dotnet build`/`run`
+  ignore it — so a whole class of breakage first appears in the published artifact and in nothing you
+  ran while developing. v0.4.0-beta shipped a single-file build that crashed on launch because the
+  native libs weren't bundled, and the in-app update path was what surfaced it, for users.
 - `gh` is authed as **gsa700**; repo is **gsa700/w2-monitor-x**; the updater slug matches.
-- Commit trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
+- Commit trailer: `Co-Authored-By: Claude <model> <noreply@anthropic.com>`, naming the model you're
+  actually running as (e.g. `Claude Opus 5`) — history has 4.8 and 5 as the models changed.
 - Confirm outward-facing actions (public releases, repo changes) with David first.
 - **Dogfooding feedback → `BACKLOG.md`**, batched into releases.
 - Keep new Core logic **pure and unit-tested** (`tests/W2.Core.Tests`, xUnit) — that's how the
@@ -137,10 +158,20 @@ Also just inspect the environment directly: `ls -l /dev/serial/by-id/`, `ls /dev
 
 ## Current state
 
-- Branch `main`; latest is the README-screenshots commit; latest release **v0.3.2-beta**
-  (`main` is ~1 doc commit ahead of that tag). The retired PowerShell app is at
-  `github.com/gsa700/w2-monitor` (archived).
+*Refreshed 2026-07-29 — the rest of this doc is the 2026-07-06 snapshot described in the banner up top.*
+
+- Branch `main`, in sync with `origin/main`; latest release **v0.5.1-beta**, tagged at the head commit.
+  The retired PowerShell app is at `github.com/gsa700/w2-monitor` (archived).
+- **Landed since this doc was written:** the SWR alarm and its bar coloring (v0.3.8-beta), single-file
+  native-lib bundling (v0.4.0-beta — see the smoke-test step in the recipe for why that matters),
+  per-meter windows and the config-durability batch (v0.4.1-beta), the **.NET 8 → 10 retarget** plus a
+  D-Bus CVE pin that affects the Linux/Pi builds only (v0.5.0-beta), and the last of the bug-hunt
+  fixes (v0.5.1-beta). `CHANGELOG.md` has the detail; `BACKLOG.md` is the live list of what's open.
+- The .NET 10 retarget means **this box needs the .NET 10 SDK** before `dotnet build` will work here —
+  the `global.json` pin is deliberate, so don't downgrade it to whatever SDK happens to be installed.
+- Test count is **117**, not the 78 quoted in the build section above when this was written.
 - You're in **bash on Linux**, not PowerShell. `tools/Capture-W2.ps1` needs `pwsh` (likely
   absent) — prefer the harness above or plain shell tools.
-- Native on the Pi you *can* launch the GUI and see it; the Windows session could not — so
-  render/scale observations are yours to make (loop David in for visual calls).
+- Native on the Pi you *can* launch the GUI and look at it. A Windows-side session can launch it and
+  confirm the process survives, but not see what it renders — so render/scale and layout calls are
+  still yours to make (loop David in for visual ones).

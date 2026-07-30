@@ -105,3 +105,8 @@ Each W2 is followed by its USB chip serial: FTDI serial pinning on **Windows** (
 (asset names must match what the updater expects). Version scheme mirrors the PS app:
 `<1.0` = `-beta` (in use, not broadly field-tested); publish as a full "Latest" release so the
 updater sees it. Update `CHANGELOG.md` for every release.
+
+Two ordering traps, both spelled out in the step-by-step recipe in `HANDOFF-PI.md`: **commit the
+version bump before publishing** (binaries embed the commit sha, so publishing first stamps them with
+a sha that isn't the release tag), and **smoke-test a published single-file binary before uploading**
+(single-file bundling only applies on publish with a RID, so `build`/`run` can't surface a break in it).
