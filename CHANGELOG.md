@@ -5,6 +5,11 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+## [0.6.1-beta] - 2026-07-30
+
+Follow-up to 0.6.0-beta: the tabbed Setup as it should have shipped, and the Windows installed-apps
+entry made able to repair itself. No new features, and nothing changed on the serial or protocol side.
+
 ### Changed
 - **Setup's tabs look like tabs.** Fluent draws them as large underlined text, which against this dark
   palette read as a row of labels — outlined and rounded now, with the selected one filled and merged
