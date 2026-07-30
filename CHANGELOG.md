@@ -5,6 +5,19 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+### Changed
+- **Avalonia 11.2.1 → 12.1.1.** A major-version jump that needed **no source changes at all** — build
+  clean with zero warnings. LP-100A made the same jump first and hit exactly one deprecation
+  (`TextBox.Watermark` → `PlaceholderText`), which this app never used. Verified on Windows against
+  both real W2s and, in `--sim`, across every drawing path of the custom `PowerSwrBar`: forward fill,
+  cyan peak-hold marker, the SWR gradient, and both phases of the alarm flash.
+- **`Avalonia.Diagnostics` dropped rather than bumped** — it has no 12.x release, and nothing here ever
+  called `AttachDevTools()`, so the Debug-only reference was dead weight.
+- **`System.IO.Ports` and `System.Management` 8.0.0 → 10.0.10.** Both were left behind by the .NET 10
+  retarget in 0.5.0-beta, which moved the target framework but not the packages. Serial re-verified on
+  real hardware afterwards: both meters connect, decode, and resolve the connect-time state probe.
+- Publish size grew about 5% (win-x64 99 → 104 MB, linux-x64 95 → 99, linux-arm64 101 → 106).
+
 ### Fixed
 - **Setup's meter list now shows a connected meter as green, not amber.** The dot means three things —
   red for an error, amber for "port open but nothing decoded yet", green for live data — and the amber
@@ -30,6 +43,21 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 - **Peak-hold marker and alarm flash edge cases.** The marker could be drawn at a negative offset when
   the control is narrower than the marker itself, and the alarm flash didn't resume if the bar was
   re-parented mid-alarm. Neither is reachable in the current window layout. (`PowerSwrBar`.)
+
+### Security
+- **The hand-rolled `Tmds.DBus.Protocol` pin is gone, and the vulnerability stays fixed.** 0.5.0-beta
+  pinned 0.21.3 by hand to patch [CVE-2026-39959] on the Linux and Raspberry Pi builds. Avalonia 12
+  resolves 0.94.1 through `Avalonia.FreeDesktop` on its own, which is also patched and *newer* than the
+  pin — so keeping the pin would now hold the version down rather than up. `dotnet list package` with
+  the vulnerable and include-transitive switches reports clean across all three projects.
+
+### Build
+- **Native debug symbols are no longer published.** Avalonia 12 pulls SkiaSharp and HarfBuzzSharp builds
+  that ship `.pdb` symbols (`libSkiaSharp` 84 MB, `libHarfBuzzSharp` 21 MB) which, unlike the natives
+  themselves, are *not* bundled into the single file — they land loose beside the executable. That would
+  have roughly doubled every release zip and broken the one-self-contained-exe assumption the in-app
+  updater depends on, since it copies only the exe. A publish target drops them; the managed `.pdb`s are
+  tiny and stay, so crash traces from this app's own code still resolve. (`W2.App.csproj`.)
 
 ### Internal
 - `SerialReader` gained its first unit tests — 6 lifecycle checks that need no serial port — and

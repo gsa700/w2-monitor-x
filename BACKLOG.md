@@ -32,38 +32,14 @@ From the 2026-07-17 bug hunt — real findings not fixed in the 0.4.1 batch:
 
 David's list, 2026-07-29. His framing was "no particular order"; the order below is a recommendation
 with its reasoning attached, not a decision taken. The `lp100a-monitor` cross-references are the point
-of half of these — that project is the reference template for the station tools, and two of the four
+of these — that project is the reference template for the station tools, and both remaining items
 already exist there in working, tested form.
 
-**Keep the Avalonia bump out of the same release as the SensorLock change.** That fix is still awaiting
-its on-air test (see Open), and a renderer bump in the same build would muddy the result.
+The Avalonia bump that led this list is done — see Done. The note it carried still stands for whatever
+ships next: keep a renderer bump out of the same release as the SensorLock change, which is still
+awaiting its on-air test (see Open).
 
-1. **Avalonia 11.2.1 → 12.1.x, plus the BCL packages the net10 retarget left behind.** LP-100A made
-   this jump on 2026-07-28 — read *The .NET 10 + Avalonia 12 migration* in its `CLAUDE.md` before
-   starting, because the discovery cost is already paid there:
-   - Its only deprecation was `TextBox.Watermark` → `PlaceholderText`. W2 doesn't use `Watermark`
-     (checked), so this may be a zero-source-change bump.
-   - `Avalonia.Diagnostics` has **no 12.x — drop it, don't bump it.** Nothing here calls
-     `AttachDevTools` (only generated build props reference it), so the Debug-only package is dead
-     weight. This is also why it alone shows a `11.3.x` "latest" in `dotnet list package --outdated`.
-   - **It deletes the `Tmds.DBus.Protocol` pin.** Avalonia 12 pulls 0.94.1 transitively, which clears
-     GHSA-xrw6-gwf8-vvr9. Note the csproj comment's "do NOT jump to 0.9x" is correct only *under
-     Avalonia 11* — under 12 that is the version Avalonia itself resolves. Rewrite the comment as
-     history rather than silently dropping the pin, and re-check with
-     `dotnet list package --vulnerable --include-transitive`.
-   - **Port the `TrimNativeSymbols` target** from `Lp100a.App.csproj`. Avalonia 12's SkiaSharp and
-     HarfBuzzSharp ship native `.pdb` symbols (~101 MB combined) that do *not* bundle into the single
-     file — they land loose beside the exe. That matters twice over here, because this app's updater
-     contract is a true single file with natives bundled; getting it wrong is the v0.4.0-beta
-     crash-on-launch.
-   - `System.IO.Ports` and `System.Management` are still at **8.0.0** despite the net10 retarget;
-     LP-100A moved both to 10.0.10 in its net10 commit. `System.IO.Ports` is the serial library, so
-     Linux/Pi fixes may be sitting in it.
-
-   Split the commits (BCL, then Avalonia) so a regression points at one culprit, revalidate on all
-   three platforms, and expect roughly 7% publish-size growth.
-
-2. **Self-install, ported from LP-100A.** `InstallLayout` + `InstallCommandLine` + `DesktopEntry` in
+1. **Self-install, ported from LP-100A.** `InstallLayout` + `InstallCommandLine` + `DesktopEntry` in
    Core (pure, unit-tested) with the side effects in the App layer — no Inno, WiX or MSI, and no new
    toolchain. See *Self-install (Windows and Linux)* in LP-100A's `CLAUDE.md`.
    - **Per-user under `%LOCALAPPDATA%\Programs` is a constraint, not a preference.**
@@ -85,7 +61,7 @@ its on-air test (see Open), and a renderer bump in the same build would muddy th
      `.desktop` write, symlink, `chmod`, the `sh` uninstall trampoline — has run on real hardware. This
      app is better placed to settle it, since it already runs on the CM5.
 
-3. **Tabbed Setup, as on LP-100A** (`Lp100a.App/Views/SetupWindow.axaml`: Connection / Display / Alarm
+2. **Tabbed Setup, as on LP-100A** (`Lp100a.App/Views/SetupWindow.axaml`: Connection / Display / Alarm
    / Logging / Updates). The existing sections here map almost one-to-one onto **Meters / W2 Controls /
    SWR Alarm / Display / Updates**, and there's room — this `SetupWindow.axaml` is 122 lines against
    LP-100A's 198. Independent of the installer, which drives off a first-run prompt and the command
@@ -93,6 +69,27 @@ its on-air test (see Open), and a renderer bump in the same build would muddy th
    *after* the Avalonia bump so Setup isn't laid out twice.
 
 ## Done
+
+- **Avalonia 11.2.1 → 12.1.1, and the BCL packages the net10 retarget left behind** (unreleased) — every
+  prediction in the planned entry held, and the LP-100A notes were worth reading first:
+  - **Zero source changes.** Build clean, no warnings. Its one deprecation there
+    (`TextBox.Watermark`) isn't used here, so a major-version jump cost nothing in code.
+  - `Avalonia.Diagnostics` dropped, not bumped (no 12.x; nothing called `AttachDevTools`).
+  - **The `Tmds.DBus.Protocol` pin is gone.** Avalonia 12 resolves 0.94.1 transitively, which is
+    patched and newer than the 0.21.3 pin — keeping it would now hold the version *down*. The csproj
+    comment was rewritten as history rather than deleted, since "why is there no pin here" is the
+    question a future reader will have. Vulnerability audit clean on all three projects.
+  - `TrimNativeSymbols` ported, and it is load-bearing: `libSkiaSharp.pdb` is 84 MB and
+    `libHarfBuzzSharp.pdb` 21 MB in the packages, and they do not bundle into the single file.
+    Publish output is now just the exe plus two small managed pdbs.
+  - `System.IO.Ports` and `System.Management` → 10.0.10, committed separately from the Avalonia bump.
+
+  Verified beyond build-and-tests, since a renderer major bump is not something a green suite speaks to:
+  three RIDs publish; the win-x64 single file launches; serial re-checked on both real W2s (connect,
+  decode, connect-time probe); and in `--sim` every `PowerSwrBar` drawing path exercised and screenshotted
+  — forward fill, cyan peak marker at the right offset, the SWR gradient (checked against `(swr-1)/2`),
+  and both phases of the alarm flash. Publish size +5%. Untested: linux-x64 and linux-arm64 are
+  cross-published only, so the CM5 still owes this a real launch before anything ships on it.
 
 - **Setup list's status dots stuck on amber** (unreleased) — raised as "make the connection lights green
   rather than orange"; it was a refresh bug, not a colour choice, and the colours are unchanged. Amber
