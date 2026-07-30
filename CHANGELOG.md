@@ -6,6 +6,11 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 ## [Unreleased]
 
 ### Added
+- **Setup is tabbed** — Meters / W2 Controls / SWR Alarm / Display / Updates, matching LP-100A Monitor.
+  The single stack had grown long enough that every new option pushed the window taller, and the
+  bottom sections were off the bottom of shorter screens. Each tab scrolls independently, the tab
+  showing when you close Setup is the one you get back, and opening it because an update is waiting
+  lands on Updates rather than wherever you last were.
 - **The app installs itself** — `--install` / `--uninstall`, no Inno/WiX/MSI and no new toolchain,
   ported from LP-100A Monitor. A copy run from wherever it was unzipped offers to install; it lands in
   `%LOCALAPPDATA%\Programs\W2 Monitor` (or `~/.local/share/w2-monitor`) and appears in Settings → Apps

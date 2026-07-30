@@ -57,6 +57,26 @@ public sealed class SetupViewModel : ViewModelBase
     public ObservableCollection<MeterRow> Rows { get; } = new();
     public ObservableCollection<string> Ports { get; } = new();
 
+    /// <summary>Number of tabs in <c>SetupWindow.axaml</c>; keep in step if one is added.</summary>
+    public const int TabCount = 5;
+
+    /// <summary>Index of the Updates tab, so the app can open Setup straight onto it.</summary>
+    public const int UpdatesTab = 4;
+
+    private int _selectedTabIndex;
+
+    /// <summary>
+    /// Which tab is showing. Persisted across sessions, so Setup reopens where it was left — except
+    /// when the app opens it to say something about an update, which selects <see cref="UpdatesTab"/>
+    /// first. Clamped rather than trusted: it comes back from config, and a stale or hand-edited
+    /// value would otherwise leave the TabControl with nothing selected.
+    /// </summary>
+    public int SelectedTabIndex
+    {
+        get => _selectedTabIndex;
+        set => SetProperty(ref _selectedTabIndex, Math.Clamp(value, 0, TabCount - 1));
+    }
+
     public RelayCommand AddCommand { get; }
     public RelayCommand RemoveCommand { get; }
     public RelayCommand ToggleConnectCommand { get; }

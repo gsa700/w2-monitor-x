@@ -39,16 +39,22 @@ The Avalonia bump that led this list is done — see Done. The note it carried s
 ships next: keep a renderer bump out of the same release as the SensorLock change, which is still
 awaiting its on-air test (see Open).
 
-1. **Tabbed Setup, as on LP-100A** (`Lp100a.App/Views/SetupWindow.axaml`: Connection / Display / Alarm
-   / Logging / Updates). The existing sections here map almost one-to-one onto **Meters / W2 Controls /
-   SWR Alarm / Display / Updates**, and there's room — this `SetupWindow.axaml` is 122 lines against
-   LP-100A's 198. Independent of the installer, which drives off a first-run prompt and the command
-   line and adds no Setup UI at all. Cheapest of the four and genuinely "whenever", but worth doing
-   *after* the Avalonia bump so Setup isn't laid out twice — which has since landed, so that gate is
-   clear. Note `ConfirmWindow` gained optional button labels and a detail line during the installer
-   work, if Setup wants richer prompts.
+*(All four items from the 2026-07-29 list are done — see below.)*
 
 ## Done
+
+- **Tabbed Setup, as on LP-100A** (unreleased) — Meters / W2 Controls / SWR Alarm / Display / Updates,
+  each in its own `ScrollViewer` so `MaxHeight` can't clip a control out of reach. The tab header names
+  each section, so the in-page ALL-CAPS headings went with it. `SelectedTabIndex` persists via
+  `AppConfig.SetupTab` (clamped on load), and opening Setup because of an update selects the Updates
+  tab — LP-100A restores the remembered tab in that case, so the window appears with no visible reason
+  for it; worth porting this back there. **Fluent styles `TabItem` headers at 24px**, which wrapped
+  five of them onto a second line and towered over the 11-13px body text; a local style brings them to
+  14px. Verified by screenshotting all five tabs at 150% scaling.
+
+  Note the window still resizes as you switch tabs (`SizeToContent="Height"`, as on LP-100A) — Meters
+  is roughly three times the height of Updates. If that reads as jumpy in use, a `MinHeight` on the
+  window is the knob.
 
 - **Self-install, ported from LP-100A** (unreleased) — `--install` / `--uninstall`, decisions pure and
   tested in Core (`InstallLayout`, `InstallCommandLine`, `DesktopEntry`), side effects in

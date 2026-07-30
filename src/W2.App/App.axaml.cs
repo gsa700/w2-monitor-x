@@ -43,7 +43,11 @@ public partial class App : Application
                 .Any(a => a.Equals("--sim", StringComparison.OrdinalIgnoreCase));
 
             _manager = new MeterManager(simulated);
-            _setupVm = new SetupViewModel(_manager, _display) { CheckUpdatesAtStartup = _config.CheckUpdatesAtStartup };
+            _setupVm = new SetupViewModel(_manager, _display)
+            {
+                CheckUpdatesAtStartup = _config.CheckUpdatesAtStartup,
+                SelectedTabIndex = _config.SetupTab,   // the setter clamps a stale or hand-edited value
+            };
 
             // A copy installed by hand before there was an installer is adopted where it stands, so
             // it appears in Installed apps without being copied to a second location.
@@ -86,11 +90,15 @@ public partial class App : Application
                 if (!simulated && InstallService.Mode == InstallMode.Loose && await OfferInstallAsync())
                     return;
 
-                if (openSetup || updateFailed) ShowSetup();
+                // Opening Setup to say something about an update lands on the Updates tab — otherwise
+                // it would open on whichever tab was last used and the reason wouldn't be on screen.
+                if (updateFailed) ShowSetup(SetupViewModel.UpdatesTab);
+                else if (openSetup) ShowSetup();
+
                 if (_config.CheckUpdatesAtStartup)
                 {
                     await _setupVm.CheckUpdatesAsync();
-                    if (_setupVm.UpdateAvailable) ShowSetup();
+                    if (_setupVm.UpdateAvailable) ShowSetup(SetupViewModel.UpdatesTab);
                 }
             };
         }
@@ -209,8 +217,11 @@ public partial class App : Application
 
     // --- Setup window ---
 
-    public void ShowSetup()
+    /// <param name="tab">Tab to select first, for when Setup is opened to show something specific.</param>
+    public void ShowSetup(int? tab = null)
     {
+        if (tab is not null) _setupVm.SelectedTabIndex = tab.Value;
+
         if (_setupWindow is null)
         {
             _setupWindow = new SetupWindow { DataContext = _setupVm, Topmost = _display.AlwaysOnTop };
@@ -399,6 +410,7 @@ public partial class App : Application
             }
 
             _config.CheckUpdatesAtStartup = _setupVm.CheckUpdatesAtStartup;
+            _config.SetupTab = _setupVm.SelectedTabIndex;
             _config.CaptureFrom(_display);
             ConfigStore.Save(_config);
         }

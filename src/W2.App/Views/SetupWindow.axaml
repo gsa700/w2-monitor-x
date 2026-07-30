@@ -3,120 +3,177 @@
         xmlns:vm="using:W2.App.ViewModels"
         x:Class="W2.App.Views.SetupWindow"
         x:DataType="vm:SetupViewModel"
-        Width="420" SizeToContent="Height" CanResize="False"
+        Width="460" SizeToContent="Height" MaxHeight="900" CanResize="False"
         Background="{StaticResource BgBrush}"
         Icon="/Assets/app.ico"
         Title="W2 Monitor — Setup">
 
-  <StackPanel Margin="16,14" Spacing="12">
+  <!-- Tabbed rather than one long scroll: the single stack had grown to five sections and every new
+       option pushed the window taller. The tab header now names each section, so the in-page
+       ALL-CAPS headings it used to need are gone. Each tab's content sits in a ScrollViewer so the
+       MaxHeight can never clip a control out of reach. Matches LP-100A's Setup. -->
+  <TabControl x:Name="Tabs" Margin="8" SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
 
-    <TextBlock Text="METERS" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}"/>
+    <!-- Fluent styles TabItem headers at 24px, for phone-style pivots. At that size five headers
+         wrap onto a second line here and tower over the 11-13px body text; this brings them into
+         scale with the rest of the window and keeps the strip on one line. -->
+    <TabControl.Styles>
+      <Style Selector="TabItem">
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="Padding" Value="10,6"/>
+      </Style>
+    </TabControl.Styles>
 
-    <!-- Meter list -->
-    <Border Background="{StaticResource PanelBrush}" CornerRadius="4" Padding="4">
-      <ListBox ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
-               Background="Transparent" MinHeight="90" MaxHeight="180">
-        <ListBox.ItemTemplate>
-          <DataTemplate x:DataType="vm:MeterRow">
-            <Grid ColumnDefinitions="Auto,*">
-              <Ellipse Grid.Column="0" Width="10" Height="10" Fill="{Binding DotBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-              <StackPanel Grid.Column="1">
-                <TextBlock Text="{Binding Text}" Foreground="{StaticResource TextBrush}"/>
-                <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource DimBrush}" FontSize="11"/>
-              </StackPanel>
-            </Grid>
-          </DataTemplate>
-        </ListBox.ItemTemplate>
-      </ListBox>
-    </Border>
 
-    <!-- Meter actions -->
-    <Grid ColumnDefinitions="*,*,*,*" >
-      <Button Grid.Column="0" Content="Add" Command="{Binding AddCommand}" HorizontalAlignment="Stretch" Margin="0,0,3,0"/>
-      <Button Grid.Column="1" Content="Remove" Command="{Binding RemoveCommand}" HorizontalAlignment="Stretch" Margin="3,0,3,0"/>
-      <Button Grid.Column="2" Content="Connect All" Command="{Binding ConnectAllCommand}" HorizontalAlignment="Stretch" Margin="3,0,3,0"/>
-      <Button Grid.Column="3" Content="Disc. All" Command="{Binding DisconnectAllCommand}" HorizontalAlignment="Stretch" Margin="3,0,0,0"/>
-    </Grid>
+    <!-- ==================== Meters ==================== -->
+    <TabItem Header="Meters" AutomationProperties.Name="Meters">
+      <ScrollViewer>
+        <StackPanel Margin="8" Spacing="12">
 
-    <Grid ColumnDefinitions="Auto,*">
-      <Button Grid.Column="0" Content="Detect W2s…" Command="{Binding DetectCommand}"/>
-      <TextBlock Grid.Column="1" Text="{Binding DetectStatus}" Foreground="{Binding DetectStatusBrush}"
-                 VerticalAlignment="Center" Margin="10,0,0,0" TextTrimming="CharacterEllipsis"/>
-    </Grid>
+          <Border Background="{StaticResource PanelBrush}" CornerRadius="4" Padding="4">
+            <ListBox ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                     Background="Transparent" MinHeight="90" MaxHeight="180">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:MeterRow">
+                  <Grid ColumnDefinitions="Auto,*">
+                    <Ellipse Grid.Column="0" Width="10" Height="10" Fill="{Binding DotBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <StackPanel Grid.Column="1">
+                      <TextBlock Text="{Binding Text}" Foreground="{StaticResource TextBrush}"/>
+                      <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource DimBrush}" FontSize="11"/>
+                    </StackPanel>
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </Border>
 
-    <!-- Selected meter: port assignment + connect -->
-    <TextBlock Text="SELECTED METER — PORT" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}"/>
-    <Grid ColumnDefinitions="*,Auto,Auto">
-      <ComboBox Grid.Column="0" ItemsSource="{Binding Ports}" SelectedItem="{Binding SelectedPort, Mode=TwoWay}"
-                HorizontalAlignment="Stretch" PlaceholderText="Assign COM port"/>
-      <Button Grid.Column="1" Content="{Binding ToggleConnectLabel}" Command="{Binding ToggleConnectCommand}" Width="96" Margin="6,0,0,0"/>
-      <Button Grid.Column="2" Content="Refresh" Command="{Binding RefreshCommand}" Margin="6,0,0,0"/>
-    </Grid>
+          <Grid ColumnDefinitions="*,*,*,*">
+            <Button Grid.Column="0" Content="Add" Command="{Binding AddCommand}" HorizontalAlignment="Stretch" Margin="0,0,3,0"/>
+            <Button Grid.Column="1" Content="Remove" Command="{Binding RemoveCommand}" HorizontalAlignment="Stretch" Margin="3,0,3,0"/>
+            <Button Grid.Column="2" Content="Connect All" Command="{Binding ConnectAllCommand}" HorizontalAlignment="Stretch" Margin="3,0,3,0"/>
+            <Button Grid.Column="3" Content="Disc. All" Command="{Binding DisconnectAllCommand}" HorizontalAlignment="Stretch" Margin="3,0,0,0"/>
+          </Grid>
 
-    <TextBlock Text="The main display auto-follows whichever meter is transmitting; pick one here to pin it."
-               Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
+          <Grid ColumnDefinitions="Auto,*">
+            <Button Grid.Column="0" Content="Detect W2s…" Command="{Binding DetectCommand}"/>
+            <TextBlock Grid.Column="1" Text="{Binding DetectStatus}" Foreground="{Binding DetectStatusBrush}"
+                       VerticalAlignment="Center" Margin="10,0,0,0" TextTrimming="CharacterEllipsis"/>
+          </Grid>
 
-    <!-- Window mode (only useful with more than one meter) -->
-    <CheckBox Content="One window per meter (instead of a single auto-focus window)"
-              IsChecked="{Binding Display.PerMeterWindows, Mode=TwoWay}"
-              IsVisible="{Binding MultipleMeters}" Foreground="{StaticResource TextBrush}"/>
+          <!-- Selected meter: port assignment + connect -->
+          <TextBlock Text="SELECTED METER — PORT" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}" Margin="0,4,0,0"/>
+          <Grid ColumnDefinitions="*,Auto,Auto">
+            <ComboBox Grid.Column="0" ItemsSource="{Binding Ports}" SelectedItem="{Binding SelectedPort, Mode=TwoWay}"
+                      HorizontalAlignment="Stretch" PlaceholderText="Assign COM port"/>
+            <Button Grid.Column="1" Content="{Binding ToggleConnectLabel}" Command="{Binding ToggleConnectCommand}" Width="96" Margin="6,0,0,0"/>
+            <Button Grid.Column="2" Content="Refresh" Command="{Binding RefreshCommand}" Margin="6,0,0,0"/>
+          </Grid>
 
-    <!-- W2 controls (act on the selected meter) -->
-    <TextBlock Text="W2 CONTROLS" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}" Margin="0,4,0,0"/>
-    <TextBlock Text="Act on the selected meter (must be connected)." Foreground="{StaticResource DimBrush}" FontSize="11"/>
-    <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto">
-      <Button Grid.Row="0" Grid.Column="0" Content="Auto Sensor" Command="{Binding SearchCommand}" IsEnabled="{Binding CanControl}" Background="{Binding SearchBrush}" HorizontalAlignment="Stretch" Margin="0,0,3,4"/>
-      <Button Grid.Row="0" Grid.Column="1" Content="Auto Range" Command="{Binding AutoRangeCommand}" IsEnabled="{Binding CanControl}" Background="{Binding AutoRangeBrush}" HorizontalAlignment="Stretch" Margin="3,0,3,4"/>
-      <Button Grid.Row="0" Grid.Column="2" Content="{Binding AvgPepLabel}" Command="{Binding AvgPepCommand}" IsEnabled="{Binding CanControl}" HorizontalAlignment="Stretch" Margin="3,0,0,4"/>
-      <Button Grid.Row="1" Grid.Column="0" Content="Manual Sensor" Command="{Binding SensorCommand}" IsEnabled="{Binding CanControl}" HorizontalAlignment="Stretch" Margin="0,0,3,0"/>
-      <Button Grid.Row="1" Grid.Column="1" Content="Manual Range" Command="{Binding RangeCommand}" IsEnabled="{Binding CanControl}" HorizontalAlignment="Stretch" Margin="3,0,3,0"/>
-      <Button Grid.Row="1" Grid.Column="2" Content="LEDs On/Off" Command="{Binding LedsCommand}" IsEnabled="{Binding CanControl}" Background="{Binding LedsBrush}" HorizontalAlignment="Stretch" Margin="3,0,0,0"/>
-    </Grid>
+          <TextBlock Text="The main display auto-follows whichever meter is transmitting; pick one here to pin it."
+                     Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
 
-    <!-- SWR alarm (drives the W2's keyline-disconnect relay) -->
-    <TextBlock Text="SWR ALARM" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}" Margin="0,4,0,0"/>
-    <TextBlock Text="Trip point sets where the alarm fires — it drives the rear-panel keyline-disconnect relay."
-               Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
-    <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto">
-      <Button Grid.Column="0" Content="▼" Command="{Binding AlarmDownCommand}" IsEnabled="{Binding CanControl}" Width="36"/>
-      <Border Grid.Column="1" MinWidth="70" Margin="4,0" Background="{StaticResource PanelBrush}" CornerRadius="3">
-        <TextBlock Text="{Binding AlarmTripLabel}" Foreground="{StaticResource TextBrush}" FontFamily="Consolas"
-                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-      </Border>
-      <Button Grid.Column="2" Content="▲" Command="{Binding AlarmUpCommand}" IsEnabled="{Binding CanControl}" Width="36"/>
-      <Button Grid.Column="4" Content="Lock" Command="{Binding AlarmLockCommand}" IsEnabled="{Binding CanControl}" Background="{Binding AlarmLockBrush}" Margin="0,0,4,0"/>
-      <Button Grid.Column="5" Content="Reset" Command="{Binding ResetAlarmCommand}" IsEnabled="{Binding CanControl}"/>
-    </Grid>
+          <!-- Window mode (only useful with more than one meter) -->
+          <CheckBox Content="One window per meter (instead of a single auto-focus window)"
+                    IsChecked="{Binding Display.PerMeterWindows, Mode=TwoWay}"
+                    IsVisible="{Binding MultipleMeters}" Foreground="{StaticResource TextBrush}"/>
 
-    <!-- Display toggles -->
-    <TextBlock Text="DISPLAY" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}" Margin="0,4,0,0"/>
-    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto">
-      <CheckBox Grid.Row="0" Grid.Column="0" Content="Status line" IsChecked="{Binding Display.ShowStatusLine, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
-      <CheckBox Grid.Row="0" Grid.Column="1" Content="Power bar" IsChecked="{Binding Display.ShowPowerBar, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
-      <CheckBox Grid.Row="1" Grid.Column="0" Content="SWR bar" IsChecked="{Binding Display.ShowSwrBar, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
-      <CheckBox Grid.Row="1" Grid.Column="1" Content="Reflected power" IsChecked="{Binding Display.ShowReflected, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
-      <CheckBox Grid.Row="2" Grid.Column="0" Content="Return loss" IsChecked="{Binding Display.ShowReturnLoss, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
-      <CheckBox Grid.Row="2" Grid.Column="1" Content="Peak forward" IsChecked="{Binding Display.ShowPeak, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
-      <CheckBox Grid.Row="3" Grid.Column="0" Content="TX timer" IsChecked="{Binding Display.ShowTx, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
-      <CheckBox Grid.Row="3" Grid.Column="1" Content="Always on top" IsChecked="{Binding Display.AlwaysOnTop, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
-    </Grid>
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
 
-    <Button Content="Reset peak forward" Command="{Binding ResetPeakCommand}" HorizontalAlignment="Left"/>
+    <!-- ==================== W2 Controls ==================== -->
+    <TabItem Header="W2 Controls" AutomationProperties.Name="W2 Controls">
+      <ScrollViewer>
+        <StackPanel Margin="8" Spacing="12">
 
-    <Grid ColumnDefinitions="Auto,Auto,*">
-      <TextBlock Grid.Column="0" Text="TX timeout (s)" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-      <NumericUpDown Grid.Column="1" Minimum="30" Maximum="1800" Increment="10" Width="130"
-                     Value="{Binding Display.TimeoutSec, Mode=TwoWay}"/>
-    </Grid>
+          <TextBlock Text="Act on the selected meter (must be connected)."
+                     Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
 
-    <!-- Updates -->
-    <TextBlock Text="UPDATES" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}" Margin="0,4,0,0"/>
-    <TextBlock Text="{Binding UpdateStatus}" Foreground="{Binding UpdateStatusBrush}" TextWrapping="Wrap"/>
-    <Grid ColumnDefinitions="Auto,Auto,*">
-      <Button Grid.Column="0" Content="{Binding UpdateButtonLabel}" Command="{Binding UpdateCommand}" MinWidth="140"/>
-      <Button Grid.Column="1" Content="Release page" Command="{Binding OpenReleaseCommand}" Margin="6,0,0,0"/>
-    </Grid>
-    <CheckBox Content="Check for updates at startup" IsChecked="{Binding CheckUpdatesAtStartup, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+          <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto">
+            <Button Grid.Row="0" Grid.Column="0" Content="Auto Sensor" Command="{Binding SearchCommand}" IsEnabled="{Binding CanControl}" Background="{Binding SearchBrush}" HorizontalAlignment="Stretch" Margin="0,0,3,4"/>
+            <Button Grid.Row="0" Grid.Column="1" Content="Auto Range" Command="{Binding AutoRangeCommand}" IsEnabled="{Binding CanControl}" Background="{Binding AutoRangeBrush}" HorizontalAlignment="Stretch" Margin="3,0,3,4"/>
+            <Button Grid.Row="0" Grid.Column="2" Content="{Binding AvgPepLabel}" Command="{Binding AvgPepCommand}" IsEnabled="{Binding CanControl}" HorizontalAlignment="Stretch" Margin="3,0,0,4"/>
+            <Button Grid.Row="1" Grid.Column="0" Content="Manual Sensor" Command="{Binding SensorCommand}" IsEnabled="{Binding CanControl}" HorizontalAlignment="Stretch" Margin="0,0,3,0"/>
+            <Button Grid.Row="1" Grid.Column="1" Content="Manual Range" Command="{Binding RangeCommand}" IsEnabled="{Binding CanControl}" HorizontalAlignment="Stretch" Margin="3,0,3,0"/>
+            <Button Grid.Row="1" Grid.Column="2" Content="LEDs On/Off" Command="{Binding LedsCommand}" IsEnabled="{Binding CanControl}" Background="{Binding LedsBrush}" HorizontalAlignment="Stretch" Margin="3,0,0,0"/>
+          </Grid>
 
-  </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <!-- ==================== SWR Alarm ==================== -->
+    <TabItem Header="SWR Alarm" AutomationProperties.Name="SWR Alarm">
+      <ScrollViewer>
+        <StackPanel Margin="8" Spacing="12">
+
+          <TextBlock Text="Trip point sets where the alarm fires — it drives the rear-panel keyline-disconnect relay."
+                     Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
+
+          <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto">
+            <Button Grid.Column="0" Content="▼" Command="{Binding AlarmDownCommand}" IsEnabled="{Binding CanControl}" Width="36"/>
+            <Border Grid.Column="1" MinWidth="70" Margin="4,0" Background="{StaticResource PanelBrush}" CornerRadius="3">
+              <TextBlock Text="{Binding AlarmTripLabel}" Foreground="{StaticResource TextBrush}" FontFamily="Consolas"
+                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <Button Grid.Column="2" Content="▲" Command="{Binding AlarmUpCommand}" IsEnabled="{Binding CanControl}" Width="36"/>
+            <Button Grid.Column="4" Content="Lock" Command="{Binding AlarmLockCommand}" IsEnabled="{Binding CanControl}" Background="{Binding AlarmLockBrush}" Margin="0,0,4,0"/>
+            <Button Grid.Column="5" Content="Reset" Command="{Binding ResetAlarmCommand}" IsEnabled="{Binding CanControl}"/>
+          </Grid>
+
+          <TextBlock Text="Lock latches the alarm until you reset it; without it the alarm clears itself once the SWR drops back."
+                     Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
+
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <!-- ==================== Display ==================== -->
+    <TabItem Header="Display" AutomationProperties.Name="Display">
+      <ScrollViewer>
+        <StackPanel Margin="8" Spacing="12">
+
+          <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto">
+            <CheckBox Grid.Row="0" Grid.Column="0" Content="Status line" IsChecked="{Binding Display.ShowStatusLine, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+            <CheckBox Grid.Row="0" Grid.Column="1" Content="Power bar" IsChecked="{Binding Display.ShowPowerBar, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+            <CheckBox Grid.Row="1" Grid.Column="0" Content="SWR bar" IsChecked="{Binding Display.ShowSwrBar, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+            <CheckBox Grid.Row="1" Grid.Column="1" Content="Reflected power" IsChecked="{Binding Display.ShowReflected, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+            <CheckBox Grid.Row="2" Grid.Column="0" Content="Return loss" IsChecked="{Binding Display.ShowReturnLoss, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+            <CheckBox Grid.Row="2" Grid.Column="1" Content="Peak forward" IsChecked="{Binding Display.ShowPeak, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+            <CheckBox Grid.Row="3" Grid.Column="0" Content="TX timer" IsChecked="{Binding Display.ShowTx, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+            <CheckBox Grid.Row="3" Grid.Column="1" Content="Always on top" IsChecked="{Binding Display.AlwaysOnTop, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+          </Grid>
+
+          <Button Content="Reset peak forward" Command="{Binding ResetPeakCommand}" HorizontalAlignment="Left"/>
+
+          <Grid ColumnDefinitions="Auto,Auto,*">
+            <TextBlock Grid.Column="0" Text="TX timeout (s)" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <NumericUpDown Grid.Column="1" Minimum="30" Maximum="1800" Increment="10" Width="130"
+                           Value="{Binding Display.TimeoutSec, Mode=TwoWay}"/>
+          </Grid>
+
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <!-- ==================== Updates ==================== -->
+    <TabItem Header="Updates" AutomationProperties.Name="Updates">
+      <ScrollViewer>
+        <StackPanel Margin="8" Spacing="12">
+
+          <TextBlock Text="{Binding UpdateStatus}" Foreground="{Binding UpdateStatusBrush}" TextWrapping="Wrap"/>
+
+          <Grid ColumnDefinitions="Auto,Auto,*">
+            <Button Grid.Column="0" Content="{Binding UpdateButtonLabel}" Command="{Binding UpdateCommand}" MinWidth="140"/>
+            <Button Grid.Column="1" Content="Release page" Command="{Binding OpenReleaseCommand}" Margin="6,0,0,0"/>
+          </Grid>
+
+          <CheckBox Content="Check for updates at startup" IsChecked="{Binding CheckUpdatesAtStartup, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+  </TabControl>
 </Window>

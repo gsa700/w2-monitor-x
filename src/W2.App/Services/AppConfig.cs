@@ -12,6 +12,9 @@ public sealed class AppConfig
     public double? SetupX { get; set; }
     public double? SetupY { get; set; }
 
+    /// <summary>Which Setup tab was showing, so it reopens where it was left. Clamped on load.</summary>
+    public int SetupTab { get; set; }
+
     public List<MeterConfig> Meters { get; set; } = new();
     public bool CheckUpdatesAtStartup { get; set; }
     public DisplayConfig Display { get; set; } = new();
