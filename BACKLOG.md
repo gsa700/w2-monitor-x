@@ -26,29 +26,42 @@ Dogfooding feedback and small improvements, batched into releases.
   exhibit the original bug, and the honest result is "not reproducible here" rather than "fixed."
   (`SensorLock`.)
 
-- **The installed-apps entry didn't get written on a real install (v0.6.0-beta, 2026-07-30).** After
-  David's clean install to `%LOCALAPPDATA%\Programs\W2 Monitor`, the program and the **Start Menu
-  shortcut were both there but the HKCU uninstall key was absent entirely** — not partially written,
-  absent. That matters because `RegisterWindows` creates the shortcut *after* both registry attempts,
-  so `Register` ran to completion and both `WriteUninstallEntry` passes failed at or before the first
-  value. `EnsureRegistered` should then have re-registered on the next launch, and didn't.
+- **An installed-apps entry was written and then vanished (v0.6.0-beta, 2026-07-30).** After David's
+  clean install to `%LOCALAPPDATA%\Programs\W2 Monitor`, the program and the Start Menu shortcut were
+  both present but **the HKCU uninstall key was gone** — so the app did not appear in Settings → Apps →
+  Installed apps, which is the only route most people have to remove it.
 
-  What was ruled out: the mechanism itself works. A probe driving `reg.exe` through
-  `ProcessStartInfo.ArgumentList` exactly as `RegSet` does wrote all five interesting values,
-  including the two carrying embedded quotes (`UninstallString`, `QuietUninstallString`), and an
-  install/uninstall round trip on the *same released binary* had written a correct 11-value entry
-  three minutes earlier. (`reg add` does fail on those values from PowerShell, but that's PowerShell's
-  native-call quoting, not the app's path — don't chase it.)
+  *It was written first.* The first reading of this was "both registry passes failed", and that is
+  wrong — worth stating plainly because the wrong version was briefly recorded here. David accepted the
+  install offer, which proves a window owner existed, so the "Installed, but not listed" dialog would
+  have appeared had `Install()` returned `Registered: false`. No dialog appeared. `Registered` is
+  `wrote && IsRegistered()`, so a `reg query` had to succeed at that moment. The timestamps agree: exe
+  copied 17:06:12, shortcut created 17:06:13, and `CreateShortcut` runs only *after* the registry
+  writes. The key was therefore present at 17:06:13 and absent by ~17:09.
 
-  This is the same silent failure LP-100A hit in the field, and the reason the write is already
-  verified-and-retried. A plausible unproven cause is a security product blocking a freshly downloaded
-  unsigned binary from spawning `reg.exe` against the Uninstall key, which would explain why it works
-  from a trusted shell and not from the app. Worth considering a `.reg` file plus a single
-  `reg import` instead of eleven separate spawns, which would at least make it one thing to block or
-  allow rather than eleven.
+  *Why nothing healed it.* `EnsureRegistered` checks once at startup and returns early when
+  `IsRegistered()` is true. The installed copy was launched by `LaunchDetached` immediately after a
+  successful registration, so it saw the key present and skipped. Nothing re-checks after startup, so a
+  key that disappears later is never noticed.
 
-  **The evidence is gone** — the entry was repaired by hand on 2026-07-30 so the install would be
-  removable, which means a fresh reproduction needs a clean install on another machine.
+  *Ruled out.* The mechanism works: a probe driving `reg.exe` through `ProcessStartInfo.ArgumentList`
+  exactly as `RegSet` does wrote all five interesting values, including the two carrying embedded
+  quotes (`UninstallString`, `QuietUninstallString`), and an install/uninstall round trip on the *same
+  released binary* wrote a correct 11-value entry three minutes earlier. (`reg add` does fail on those
+  values from PowerShell, but that is PowerShell's native-call quoting, not the app's path — don't
+  chase it.) No Defender detections in the window, and no orphaned uninstall helper in `%TEMP%`.
+
+  *What removed it is unknown.* Deleting the old hand-installed folder afterwards touches no registry.
+  No code path in this app deletes that key except `Uninstall`, which was not run.
+
+  *Worth doing regardless of cause:* have registration **rewrite rather than check-and-skip**, so any
+  later loss is repaired on the next launch. Doing that with the current design costs eleven `reg.exe`
+  spawns per start; generating a `.reg` file and running a single `reg import` makes it one spawn, and
+  incidentally makes the whole registration one thing for a security product to allow or block instead
+  of eleven. LP-100A shares this code and this weakness.
+
+  **The evidence is gone** — the entry was repaired by hand so the install would be removable, so a
+  fresh reproduction needs a clean install on another machine.
 
 ## Planned
 
