@@ -129,9 +129,14 @@ Also just inspect the environment directly: `ls -l /dev/serial/by-id/`, `ls /dev
      that before publishing.**
   3. Publish 3 RIDs self-contained single-file (`win-x64`, `linux-x64`, `linux-arm64`), then zip each
      as `W2Monitor-<rid>.zip` — those exact asset names are what the updater matches on.
-  4. **Smoke-test a published binary before uploading it.** Launch it with `--sim`, pointing
-     `APPDATA` (Windows) or `XDG_CONFIG_HOME`/`HOME` (Linux) at a throwaway dir so it can't touch the
-     live `config.json`; confirm it's still alive several seconds later.
+  4. **Smoke-test a published binary before uploading it.** Launch it with `--sim` and confirm it's
+     still alive several seconds later.
+     **On Windows, do not expect `APPDATA` to isolate it** — .NET resolves
+     `SpecialFolder.ApplicationData` through the known-folder API, not the environment variable, so a
+     redirected `APPDATA` is ignored and the smoke test reads the real `config.json`. What actually
+     protects it is ending the run with a force kill (`Stop-Process -Force`), so the app never
+     reaches its save-on-exit path; copy `config.json` aside first if you want certainty. On Linux,
+     redirecting `HOME`/`XDG_CONFIG_HOME` does work.
   5. `git tag -a vX.Y.Z-beta` → `git push origin main --follow-tags`.
   6. `gh release create vX.Y.Z-beta <zips> --title … --latest`. **Use `--latest`, NOT
      `--prerelease`** — the in-app updater queries `/releases/latest`, which skips pre-releases.

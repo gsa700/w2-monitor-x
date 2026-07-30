@@ -39,36 +39,35 @@ The Avalonia bump that led this list is done — see Done. The note it carried s
 ships next: keep a renderer bump out of the same release as the SensorLock change, which is still
 awaiting its on-air test (see Open).
 
-1. **Self-install, ported from LP-100A.** `InstallLayout` + `InstallCommandLine` + `DesktopEntry` in
-   Core (pure, unit-tested) with the side effects in the App layer — no Inno, WiX or MSI, and no new
-   toolchain. See *Self-install (Windows and Linux)* in LP-100A's `CLAUDE.md`.
-   - **Per-user under `%LOCALAPPDATA%\Programs` is a constraint, not a preference.**
-     `UpdateService.ApplyAndRestart` replaces the running executable in place, which needs no
-     elevation there and would need it on every update under `Program Files` — a machine-wide
-     installer quietly breaks the updater. This app runs the same updater, so the same constraint
-     binds. Don't "fix" the location without re-reading that method.
-   - **`LegacyFolders` must cover the hand-unzipped layouts**: `W2Monitor` plus `W2Monitor-win-x64`,
-     `-linux-x64`, `-linux-arm64`. The live Windows install sits in
-     `%LOCALAPPDATA%\Programs\W2Monitor-win-x64`, so without adoption the first run installs a second
-     copy and orphans the one actually in use.
-   - **Simpler here than there:** no transmission log. Most of LP-100A's uninstall care is protecting
-     `TXlog.csv`; this app has only `config.json` (plus its `.bak`), so the prompts collapse to one.
-   - Registry writes go through `reg.exe` deliberately — the registry APIs need `net10.0-windows`, and
-     the plain `net10.0` TFM is what lets one target cross-publish Linux and Pi.
-   - On uninstall, remove shared-directory items **file at a time**; never delete a directory the app
-     doesn't own. On Linux that mistake takes out every user binary on the machine.
-   - **Inherits an unverified half:** none of LP-100A's Linux filesystem work — icon extraction,
-     `.desktop` write, symlink, `chmod`, the `sh` uninstall trampoline — has run on real hardware. This
-     app is better placed to settle it, since it already runs on the CM5.
-
-2. **Tabbed Setup, as on LP-100A** (`Lp100a.App/Views/SetupWindow.axaml`: Connection / Display / Alarm
+1. **Tabbed Setup, as on LP-100A** (`Lp100a.App/Views/SetupWindow.axaml`: Connection / Display / Alarm
    / Logging / Updates). The existing sections here map almost one-to-one onto **Meters / W2 Controls /
    SWR Alarm / Display / Updates**, and there's room — this `SetupWindow.axaml` is 122 lines against
    LP-100A's 198. Independent of the installer, which drives off a first-run prompt and the command
    line and adds no Setup UI at all. Cheapest of the four and genuinely "whenever", but worth doing
-   *after* the Avalonia bump so Setup isn't laid out twice.
+   *after* the Avalonia bump so Setup isn't laid out twice — which has since landed, so that gate is
+   clear. Note `ConfirmWindow` gained optional button labels and a detail line during the installer
+   work, if Setup wants richer prompts.
 
 ## Done
+
+- **Self-install, ported from LP-100A** (unreleased) — `--install` / `--uninstall`, decisions pure and
+  tested in Core (`InstallLayout`, `InstallCommandLine`, `DesktopEntry`), side effects in
+  `InstallService`. Per-user under `%LOCALAPPDATA%\Programs` as the updater requires; hand-unzipped
+  copies adopted where they stand, including this station's `W2Monitor-win-x64`; settings named rather
+  than the data directory swept, and kept unless explicitly declined. Verified end to end on Windows —
+  install, quiet uninstall, and the offer dialog at 150% scaling — with the live install and config
+  untouched throughout.
+
+  Two findings worth carrying elsewhere. **Uninstall deletes `ExeDirectory` only when the copy is
+  `Installed`**; LP-100A deletes it unconditionally, which would take out a download folder — or
+  Downloads itself, if someone extracted the exe straight into it. Worth porting back there. And
+  **`APPDATA` does not isolate this app's config on Windows**: .NET resolves
+  `SpecialFolder.ApplicationData` through the known-folder API and ignores the environment variable, so
+  the release recipe's smoke-test step claimed a protection that never existed. Corrected in
+  `HANDOFF-PI.md`; what actually protects a smoke test is force-killing it before save-on-exit.
+
+  Still open: the Linux half compiles, cross-publishes and is unit-tested, but none of its filesystem
+  work has run on real hardware. The CM5 is where that gets settled.
 
 - **Avalonia 11.2.1 → 12.1.1, and the BCL packages the net10 retarget left behind** (unreleased) — every
   prediction in the planned entry held, and the LP-100A notes were worth reading first:

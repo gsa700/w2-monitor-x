@@ -98,6 +98,48 @@ Each W2 is followed by its USB chip serial: FTDI serial pinning on **Windows** (
 - A Pi-side Claude session has worked this repo too (`HANDOFF-PI.md`); the two boxes sync via git
   (`main`, two-way pull/push). Keep `main` clean and rebased-friendly.
 
+## Self-install (Windows and Linux)
+
+Ported from LP-100A Monitor, which established the pattern — read its `CLAUDE.md` section of the same
+name for the full rationale. No Inno/WiX/MSI and no new toolchain: the app installs *itself* via
+`--install` / `--uninstall`, with the pure decisions in `W2.Core` (`InstallLayout`,
+`InstallCommandLine`, `DesktopEntry` — all unit-tested) and the side effects in
+`W2.App/Services/InstallService.cs`.
+
+- **Per-user is a constraint, not a preference.** `UpdateService.ApplyAndRestart` replaces the running
+  executable in place, which needs no elevation under `%LOCALAPPDATA%\Programs` and would need it on
+  every update under `Program Files`. A machine-wide installer would quietly break the updater. Don't
+  "fix" the install location without re-reading that method.
+- **Location is the mode.** `InstallLayout.Detect` returns Installed / Portable / Loose from the
+  executable's directory plus a `portable.txt` marker. Nothing is written that could disagree with
+  where the file actually is, and the marker beats everything, including the install directory.
+- **Pre-installer copies are adopted where they stand.** `LegacyFolders` covers `W2Monitor` and the
+  three RID-suffixed folder names Explorer creates from the release zips — this station's own install
+  is `%LOCALAPPDATA%\Programs\W2Monitor-win-x64`, and without adoption the first run would install a
+  second copy and orphan the live one.
+- **Uninstall only deletes a directory the app owns.** `Uninstall` removes `ExeDirectory` *only* when
+  `Mode == Installed`; a Loose copy's folder is not ours, and someone who extracted the exe straight
+  into Downloads would otherwise lose Downloads. **This is a divergence from LP-100A, which deletes it
+  unconditionally — worth porting back there.** Shared directories (`~/.local/bin`, the icon theme,
+  `~/.local/share/applications`) are always removed one file at a time, never as a directory.
+- **Settings are named, not swept.** `DataFilesToRemove` lists `config.json` and its `.bak`; the data
+  directory itself is never removed, so anything a later version puts there survives an older
+  uninstall. The prompt defaults to keeping them — they hold the meter list and each cable's chip
+  serial. A quiet uninstall (what the installed-apps entry's own button runs) always keeps them,
+  because Windows gives the user no way to answer a dialog it didn't expect.
+- **Registry goes through `reg.exe`, deliberately** — the registry APIs need `net10.0-windows`, and the
+  plain `net10.0` TFM is what lets one target cross-publish Linux and Pi. The entry is written,
+  verified, and rewritten once if the check fails: on LP-100A a spawn silently didn't take, leaving
+  the app installed but absent from Installed apps with no error anywhere.
+- **The Linux icon is the 256px frame lifted verbatim from `app.ico`**, embedded as a plain
+  `EmbeddedResource` because `--install` runs before Avalonia is initialised, so the asset loader
+  isn't available. Regenerate it from `app.ico` rather than editing the two separately.
+
+> **Linux is unverified on hardware**, exactly as in LP-100A. It compiles, cross-publishes, and its
+> pure logic is unit-tested, but no part of the filesystem work — icon write, `.desktop` entry,
+> symlink, `chmod`, the `sh` uninstall trampoline — has run on a real Linux box. The CM5 is the place
+> to settle it. Windows is verified end to end, both uninstall paths included.
+
 ## Release workflow
 
 `gh` is installed and authed as `gsa700`. A release = git tag + three self-contained zips

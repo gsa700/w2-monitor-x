@@ -5,6 +5,19 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+### Added
+- **The app installs itself** — `--install` / `--uninstall`, no Inno/WiX/MSI and no new toolchain,
+  ported from LP-100A Monitor. A copy run from wherever it was unzipped offers to install; it lands in
+  `%LOCALAPPDATA%\Programs\W2 Monitor` (or `~/.local/share/w2-monitor`) and appears in Settings → Apps
+  → Installed apps with a Start Menu shortcut, or in the applications menu on Linux with a
+  `~/.local/bin/w2-monitor` symlink. **Per-user is required, not chosen:** the in-app updater replaces
+  the running executable in place, which would need elevation on every update under `Program Files`.
+  A copy already installed by hand — this station's is `…\Programs\W2Monitor-win-x64` — is adopted
+  where it stands rather than duplicated. Put a `portable.txt` beside the program to be left alone.
+  Uninstall keeps your settings unless you say otherwise, and only ever deletes a directory the app
+  owns. Windows verified end to end; the Linux paths are cross-published and unit-tested but have not
+  yet run on real hardware.
+
 ### Changed
 - **Avalonia 11.2.1 → 12.1.1.** A major-version jump that needed **no source changes at all** — build
   clean with zero warnings. LP-100A made the same jump first and hit exactly one deprecation
