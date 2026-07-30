@@ -6,6 +6,12 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 ## [Unreleased]
 
 ### Fixed
+- **Setup's meter list now shows a connected meter as green, not amber.** The dot means three things —
+  red for an error, amber for "port open but nothing decoded yet", green for live data — and the amber
+  state is worth seeing when the meter is powered off or the cable is in the wrong adapter. But the rows
+  were only ever repainted when the meter list or a connection state changed, and a *reading* is neither,
+  so they kept the amber set at connect for the whole session while the main window's dot correctly went
+  green. The list is now told once per connection when frames start arriving. (`MeterManager`.)
 - **A reader fault can no longer take the app down with it.** `Supervise` ran without a `catch`, so an
   exception on that background thread was unhandled — which in .NET means the whole process exits. The
   reachable trigger: `Stop()`'s 3 s join times out on a wedged session, `Dispose()` disposes the stop

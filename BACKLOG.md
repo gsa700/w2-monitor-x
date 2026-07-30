@@ -38,19 +38,7 @@ already exist there in working, tested form.
 **Keep the Avalonia bump out of the same release as the SensorLock change.** That fix is still awaiting
 its on-air test (see Open), and a renderer bump in the same build would muddy the result.
 
-1. **Connection dots read amber when they should read green — likely a refresh bug, not a palette
-   choice.** Amber does not mean "connected"; it means *port open, nothing decoded yet*
-   (`StatusIsError ? Red : Current is not null ? Green : Amber`). That is precisely the state worth
-   seeing when the meter is powered off, the baud is wrong, or the cable is in the wrong adapter, so
-   recolouring it green would delete a real diagnostic rather than fix anything. Suspected cause:
-   `MeterRow.DotBrush` refreshes only when `MeterManager.MetersChanged` fires, and a reading doesn't
-   fire it — `OnReading` raises it only when the *focus* changes. So the Setup list's dots freeze at
-   their last state-change value, which is the amber set during `Connect()` before the first reading
-   lands, while the main window's dot updates correctly via `FocusReadingUpdated`. **Confirm first:**
-   is the main-window dot green while the Setup list dots stay orange? If so, refresh the rows on
-   reading and leave the colours alone. Small; can ride along with the fixes already in `[Unreleased]`.
-
-2. **Avalonia 11.2.1 → 12.1.x, plus the BCL packages the net10 retarget left behind.** LP-100A made
+1. **Avalonia 11.2.1 → 12.1.x, plus the BCL packages the net10 retarget left behind.** LP-100A made
    this jump on 2026-07-28 — read *The .NET 10 + Avalonia 12 migration* in its `CLAUDE.md` before
    starting, because the discovery cost is already paid there:
    - Its only deprecation was `TextBox.Watermark` → `PlaceholderText`. W2 doesn't use `Watermark`
@@ -75,7 +63,7 @@ its on-air test (see Open), and a renderer bump in the same build would muddy th
    Split the commits (BCL, then Avalonia) so a regression points at one culprit, revalidate on all
    three platforms, and expect roughly 7% publish-size growth.
 
-3. **Self-install, ported from LP-100A.** `InstallLayout` + `InstallCommandLine` + `DesktopEntry` in
+2. **Self-install, ported from LP-100A.** `InstallLayout` + `InstallCommandLine` + `DesktopEntry` in
    Core (pure, unit-tested) with the side effects in the App layer — no Inno, WiX or MSI, and no new
    toolchain. See *Self-install (Windows and Linux)* in LP-100A's `CLAUDE.md`.
    - **Per-user under `%LOCALAPPDATA%\Programs` is a constraint, not a preference.**
@@ -97,7 +85,7 @@ its on-air test (see Open), and a renderer bump in the same build would muddy th
      `.desktop` write, symlink, `chmod`, the `sh` uninstall trampoline — has run on real hardware. This
      app is better placed to settle it, since it already runs on the CM5.
 
-4. **Tabbed Setup, as on LP-100A** (`Lp100a.App/Views/SetupWindow.axaml`: Connection / Display / Alarm
+3. **Tabbed Setup, as on LP-100A** (`Lp100a.App/Views/SetupWindow.axaml`: Connection / Display / Alarm
    / Logging / Updates). The existing sections here map almost one-to-one onto **Meters / W2 Controls /
    SWR Alarm / Display / Updates**, and there's room — this `SetupWindow.axaml` is 122 lines against
    LP-100A's 198. Independent of the installer, which drives off a first-run prompt and the command
@@ -105,6 +93,26 @@ its on-air test (see Open), and a renderer bump in the same build would muddy th
    *after* the Avalonia bump so Setup isn't laid out twice.
 
 ## Done
+
+- **Setup list's status dots stuck on amber** (unreleased) — raised as "make the connection lights green
+  rather than orange"; it was a refresh bug, not a colour choice, and the colours are unchanged. Amber
+  means *port open, nothing decoded yet* (`StatusIsError ? Red : Current is not null ? Green : Amber`),
+  which is exactly what you want to see when the meter is off, the baud is wrong, or the cable is in the
+  wrong adapter — so recolouring it would have deleted a real diagnostic and hidden the actual fault.
+
+  *Confirmed by screenshot before touching anything*, both meters connected and live: the Setup rows read
+  "Connected on COM7"/"COM3" with **amber** dots while the W2 #1 window showed **green** — same meters,
+  same instant, same expression, two answers. Cause: `MeterRow.DotBrush` is recomputed only when
+  `MetersChanged` fires, and a reading doesn't raise it (`OnReading` raises it only when the *focus*
+  moves), so the rows kept the amber set during `Connect()` for the whole session while the meter window
+  updated fine via `FocusReadingUpdated`.
+
+  Fixed with `MeterManager.NoteFirstReading`: raise `MetersChanged` on the `Current` null→non-null edge,
+  once per connection rather than at ~4.5 Hz × N meters. That's the only dot input no other event covers
+  — connected and error both arrive via `StateChanged`. The flag re-arms on disconnect (which nulls
+  `Current`), so a reconnect announces again. Re-screenshotted after: both dots green, layout otherwise
+  identical. Refreshing rows per frame was the alternative and would have rebuilt every row's label
+  string several times a second for nothing.
 
 - **Minor hardening cluster** (unreleased) — five latent items, and checking them turned up that they
   were not equally real:

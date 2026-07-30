@@ -17,6 +17,7 @@ public sealed class MeterManager : IDisposable
 
     private string? _manualFocusId;
     private readonly Dictionary<string, bool> _wasTx = new();
+    private readonly Dictionary<string, bool> _hadReading = new();
     private int _nextSimOffset;
 
     public MeterService? Focus { get; private set; }
@@ -44,6 +45,7 @@ public sealed class MeterManager : IDisposable
         meter.ReadingReceived += OnReading;
         meter.StateChanged += OnState;
         _wasTx[meter.Id] = false;
+        _hadReading[meter.Id] = false;
         Meters.Add(meter);
         RecomputeFocus();
         MetersChanged?.Invoke();
@@ -57,6 +59,7 @@ public sealed class MeterManager : IDisposable
         meter.Disconnect();
         meter.Dispose();
         _wasTx.Remove(meter.Id);
+        _hadReading.Remove(meter.Id);
         Meters.Remove(meter);
         if (_manualFocusId == meter.Id) _manualFocusId = null;
         RecomputeFocus();
@@ -78,11 +81,15 @@ public sealed class MeterManager : IDisposable
     {
         NoteOverStart(m);
         RecomputeFocus();
+        NoteFirstReading(m);   // after the focus settles, so a refresh triggered here sees it
         if (ReferenceEquals(m, Focus)) FocusReadingUpdated?.Invoke();
     }
 
     private void OnState(MeterService m)
     {
+        // Disconnect clears Current, so re-arm the announcement for the next connect — otherwise a
+        // reconnected meter would sit on the pre-first-frame dot again with nothing left to clear it.
+        if (m.Current is null) _hadReading[m.Id] = false;
         RecomputeFocus();
         MetersChanged?.Invoke();
     }
@@ -93,6 +100,23 @@ public sealed class MeterManager : IDisposable
         var was = _wasTx.TryGetValue(m.Id, out var v) && v;
         if (m.IsTransmitting && !was) _manualFocusId = m.Id;
         _wasTx[m.Id] = m.IsTransmitting;
+    }
+
+    /// <summary>
+    /// Announce the moment a meter goes from connected to actually delivering frames. Anything showing
+    /// a meter's state off <see cref="MetersChanged"/> — the Setup list's status dot, in particular —
+    /// otherwise keeps painting what was true at <c>Connect()</c>, i.e. "port open, nothing decoded
+    /// yet", for the whole session: readings alone don't raise the event, and <c>RecomputeFocus</c>
+    /// only raises it when the focus actually moves. Fires once per connection, not per frame, since
+    /// this is the one dot input that no other event covers (connected/error both arrive via
+    /// <c>StateChanged</c>).
+    /// </summary>
+    private void NoteFirstReading(MeterService m)
+    {
+        if (_hadReading.TryGetValue(m.Id, out var had) && had) return;
+        if (m.Current is null) return;
+        _hadReading[m.Id] = true;
+        MetersChanged?.Invoke();
     }
 
     private void RecomputeFocus()
