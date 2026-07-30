@@ -22,8 +22,8 @@ Raspberry Pi**. Built with .NET 10 + Avalonia.
 - **Multiple W2 meters at once** — each on its own background thread; the main display
   auto-focuses whichever meter is transmitting (the **strongest**, if several key at once —
   the others keep tracking in the background; pin one in **Setup** to watch it). **Detect**
-  finds connected meters. With several meters you can also open a **dedicated window per meter**
-  (Setup → *Open a dedicated window…*) and lay them out side-by-side; your layout is remembered.
+  finds connected meters. With several meters you can also give each its **own window**
+  (Setup → Meters → *One window per meter*) and lay them out side-by-side; your layout is remembered.
 - **Steady in Search mode** — when the W2 hunts between its two samplers, the readout locks to
   the sampler carrying your over and ignores stray RF the meter picks up on the other. Applied
   per meter, so it holds independently across multiple W2s.
@@ -35,6 +35,9 @@ Raspberry Pi**. Built with .NET 10 + Avalonia.
 - **TX-timeout timer** — solid yellow 30 s before timeout, flashing red at/after (silent).
 - **Follows your cable** by its USB chip serial (Windows) or `/dev/serial/by-id` (Linux), so a
   meter keeps its identity across port renumbering.
+- **Installs itself** — no installer to run and nothing to build. It offers to put itself in the
+  usual per-user place and register with your desktop, or you can keep running it from wherever you
+  unzipped it. See [Install](#install).
 - **In-app updater**, display toggles, and window/meter state that persists between sessions.
 
 ## Screenshots
@@ -43,10 +46,9 @@ Transmitting — live power and SWR with the cyan peak-hold marker riding the ba
 
 ![Transmitting into a dummy load](docs/transmitting.png)
 
-The Setup window — meters (with each cable's serial), W2 controls, display toggles, and the
-in-app updater:
+The Setup window — tabbed into Meters, W2 Controls, SWR Alarm, Display and Updates:
 
-![Main and Setup windows](docs/overview.png)
+![The Setup window](docs/setup.png)
 
 ## Install
 
@@ -57,14 +59,26 @@ in-app updater:
    - **Raspberry Pi:** `W2Monitor-linux-arm64.zip`
 2. Extract it. The build is **self-contained** — no .NET install required.
 3. Run **`W2Monitor`** (`W2Monitor.exe` on Windows). On Linux you may need `chmod +x W2Monitor` first.
+4. It offers to **install itself**. Say yes and it copies into the per-user application folder and
+   registers with your desktop; say *Not now* and it just runs from where it is.
 
-Then click **Setup**, add your W2's port (or **Detect**), and **Connect**.
+Then open **Setup**, add your W2's port (or **Detect**), and **Connect**.
 
-**Want a desktop shortcut?** Make one with your OS's own tools:
-- **Windows:** right-click `W2Monitor.exe` → **Show more options** → **Send to** →
-  **Desktop (create shortcut)**.
-- **Linux:** use your desktop's "create launcher / add to favorites" option, or hand-write a
-  `.desktop` entry pointing `Exec=` at the `W2Monitor` binary.
+### About installing
+
+Installing is per-user and needs no administrator rights — that's required rather than chosen, since
+the in-app updater replaces the running program in place.
+
+| | Windows | Linux / Raspberry Pi |
+|---|---|---|
+| Goes in | `%LOCALAPPDATA%\Programs\W2 Monitor` | `~/.local/share/w2-monitor` |
+| Appears in | Settings → Apps → Installed apps, plus a Start Menu shortcut | your applications menu, plus a `~/.local/bin/w2-monitor` symlink |
+| Remove with | the entry in Installed apps | `w2-monitor --uninstall` |
+
+Prefer to keep it where it is? Put an empty file named **`portable.txt`** beside the program and it
+will never ask again or touch anything outside its own folder. Uninstalling keeps your settings
+unless you explicitly say otherwise, and `--install` / `--uninstall` work unattended if you'd rather
+script it.
 
 ## Requirements
 
@@ -81,6 +95,10 @@ Then click **Setup**, add your W2's port (or **Detect**), and **Connect**.
   FTDI chip-serial pinning, so a replug/renumber doesn't lose the meter.
 - **Raspberry Pi:** use the `linux-arm64` build (Avalonia/Skia renderer); validated on a Pi CM5.
   The reader auto-reconnects and follows the cable by its `by-id` serial across USB drops/renumbers.
+- **Installing on Linux is new and not yet shaken down on real hardware** (as of 0.6.0-beta). The
+  monitor itself is well tested here; it's the install/uninstall paths — the menu entry, icon,
+  symlink and removal — that haven't been run on a Linux box yet. Until they have, running it from
+  where you unzipped it (or dropping a `portable.txt` beside it) is the conservative choice.
 
 ## Build from source
 

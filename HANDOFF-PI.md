@@ -26,7 +26,7 @@ suspect; treat the Windows-validated logic (below) as trustworthy.
 ```sh
 git clone https://github.com/gsa700/w2-monitor-x && cd w2-monitor-x
 dotnet build                                   # needs the .NET 10 SDK
-dotnet test                                    # 117 tests, all pure Core logic — should pass on ARM
+dotnet test                                    # 168 tests, all pure Core logic — should pass on ARM
 dotnet run --project src/W2.App                # the app (needs a desktop/DISPLAY)
 dotnet run --project src/W2.App -- --sim       # UI from a synthetic meter, no hardware
 ```
@@ -163,18 +163,47 @@ Also just inspect the environment directly: `ls -l /dev/serial/by-id/`, `ls /dev
 
 ## Current state
 
-*Refreshed 2026-07-29 — the rest of this doc is the 2026-07-06 snapshot described in the banner up top.*
+*Refreshed 2026-07-30 — the rest of this doc is the 2026-07-06 snapshot described in the banner up top.*
 
-- Branch `main`, in sync with `origin/main`; latest release **v0.5.1-beta**, tagged at the head commit.
+- Branch `main`, in sync with `origin/main`; latest release **v0.6.0-beta**, tagged at the head commit.
   The retired PowerShell app is at `github.com/gsa700/w2-monitor` (archived).
 - **Landed since this doc was written:** the SWR alarm and its bar coloring (v0.3.8-beta), single-file
   native-lib bundling (v0.4.0-beta — see the smoke-test step in the recipe for why that matters),
   per-meter windows and the config-durability batch (v0.4.1-beta), the **.NET 8 → 10 retarget** plus a
-  D-Bus CVE pin that affects the Linux/Pi builds only (v0.5.0-beta), and the last of the bug-hunt
-  fixes (v0.5.1-beta). `CHANGELOG.md` has the detail; `BACKLOG.md` is the live list of what's open.
+  D-Bus CVE pin (v0.5.0-beta), the last of the bug-hunt fixes (v0.5.1-beta), and **Avalonia 12.1.1, a
+  self-installer and a tabbed Setup** (v0.6.0-beta). `CHANGELOG.md` has the detail; `BACKLOG.md` is the
+  live list of what's open.
 - The .NET 10 retarget means **this box needs the .NET 10 SDK** before `dotnet build` will work here —
   the `global.json` pin is deliberate, so don't downgrade it to whatever SDK happens to be installed.
-- Test count is **117**, not the 78 quoted in the build section above when this was written.
+- Test count is **168**, not the 78 quoted in the build section when this doc was written.
+
+### The current CM5 job: shake down the installer's Linux paths
+
+The serial mission at the top of this doc is long done. What actually needs a Pi now is the
+**self-install added in v0.6.0-beta**, because none of its filesystem work has ever run on Linux — it
+compiles, cross-publishes, and its pure logic (`InstallLayout`, `InstallCommandLine`, `DesktopEntry`)
+is unit-tested, but that's all. Read *Self-install (Windows and Linux)* in `CLAUDE.md` first.
+
+What to exercise, in rough order of how badly it fails if it's wrong:
+
+1. **`--uninstall` is where a mistake is unrecoverable.** `Unregister` must remove the `.desktop`
+   entry, the hicolor icon and the `~/.local/bin/w2-monitor` symlink **one file at a time** — those
+   live in shared directories, and deleting one as a directory takes every user binary with it. Only
+   the app's own install directory may be removed wholesale, and only when the copy is `Installed`.
+   Check `~/.local/bin` still holds everything else afterwards.
+2. **The executable bit.** A copied binary arrives without it; `MakeExecutable` sets it. Without it,
+   the menu entry silently does nothing — no error anywhere.
+3. **The `.desktop` entry** actually appearing in the menu, and `update-desktop-database` being absent
+   not breaking anything.
+4. **The icon** reaching `~/.local/share/icons/hicolor/256x256/apps/w2-monitor.png`, and the dock
+   matching the running window to it via `StartupWMClass=W2Monitor`.
+5. **The `sh` uninstall trampoline** — it waits on the pid, then deletes. Confirm it removes itself.
+
+Redirecting `HOME`/`XDG_CONFIG_HOME` genuinely does isolate config on Linux (unlike `APPDATA` on
+Windows), so a throwaway run is easy to arrange here.
+
+Also unverified on this box: **Avalonia 12 rendering**. v0.6.0-beta is the first release on it, and the
+Pi is the one platform where the D-Bus layer is actually used.
 - You're in **bash on Linux**, not PowerShell. `tools/Capture-W2.ps1` needs `pwsh` (likely
   absent) — prefer the harness above or plain shell tools.
 - Native on the Pi you *can* launch the GUI and look at it. A Windows-side session can launch it and

@@ -4,9 +4,7 @@ Dogfooding feedback and small improvements, batched into releases.
 
 ## Open
 
-From the 2026-07-17 bug hunt — real findings not fixed in the 0.4.1 batch:
-
-- **Confirm the SensorLock dip-release on a gapped signal** — partly verified; the remaining half needs
+- **Confirm the SensorLock dip-release on a gapped signal** *(from the 2026-07-17 bug hunt)* — partly verified; the remaining half needs
   SSB or CW, not a carrier.
 
   *Confirmed on air 2026-07-29* (W2 #1, Search mode): carrier on S2 locked the display to S2; keying S1
@@ -28,22 +26,43 @@ From the 2026-07-17 bug hunt — real findings not fixed in the 0.4.1 batch:
   exhibit the original bug, and the honest result is "not reproducible here" rather than "fixed."
   (`SensorLock`.)
 
+- **The installed-apps entry didn't get written on a real install (v0.6.0-beta, 2026-07-30).** After
+  David's clean install to `%LOCALAPPDATA%\Programs\W2 Monitor`, the program and the **Start Menu
+  shortcut were both there but the HKCU uninstall key was absent entirely** — not partially written,
+  absent. That matters because `RegisterWindows` creates the shortcut *after* both registry attempts,
+  so `Register` ran to completion and both `WriteUninstallEntry` passes failed at or before the first
+  value. `EnsureRegistered` should then have re-registered on the next launch, and didn't.
+
+  What was ruled out: the mechanism itself works. A probe driving `reg.exe` through
+  `ProcessStartInfo.ArgumentList` exactly as `RegSet` does wrote all five interesting values,
+  including the two carrying embedded quotes (`UninstallString`, `QuietUninstallString`), and an
+  install/uninstall round trip on the *same released binary* had written a correct 11-value entry
+  three minutes earlier. (`reg add` does fail on those values from PowerShell, but that's PowerShell's
+  native-call quoting, not the app's path — don't chase it.)
+
+  This is the same silent failure LP-100A hit in the field, and the reason the write is already
+  verified-and-retried. A plausible unproven cause is a security product blocking a freshly downloaded
+  unsigned binary from spawning `reg.exe` against the Uninstall key, which would explain why it works
+  from a trusted shell and not from the app. Worth considering a `.reg` file plus a single
+  `reg import` instead of eleven separate spawns, which would at least make it one thing to block or
+  allow rather than eleven.
+
+  **The evidence is gone** — the entry was repaired by hand on 2026-07-30 so the install would be
+  removable, which means a fresh reproduction needs a clean install on another machine.
+
 ## Planned
 
-David's list, 2026-07-29. His framing was "no particular order"; the order below is a recommendation
-with its reasoning attached, not a decision taken. The `lp100a-monitor` cross-references are the point
-of these — that project is the reference template for the station tools, and both remaining items
-already exist there in working, tested form.
+Nothing queued. All four items from David's 2026-07-29 list — the connection dots, Avalonia 12, the
+self-installer and tabbed Setup — shipped in v0.6.0-beta; the reasoning behind each is kept in Done
+below, since most of it is still the reason the code looks the way it does.
 
-The Avalonia bump that led this list is done — see Done. The note it carried still stands for whatever
-ships next: keep a renderer bump out of the same release as the SensorLock change, which is still
-awaiting its on-air test (see Open).
-
-*(All four items from the 2026-07-29 list are done — see below.)*
+The live questions are all in Open: the SSB test on the sampler lock, the missing installed-apps
+entry, and the CM5 shakedown of the installer's Linux paths (`HANDOFF-PI.md` carries the test list
+for that one).
 
 ## Done
 
-- **Tabbed Setup, as on LP-100A** (unreleased) — Meters / W2 Controls / SWR Alarm / Display / Updates,
+- **Tabbed Setup, as on LP-100A** (v0.6.0-beta) — Meters / W2 Controls / SWR Alarm / Display / Updates,
   each in its own `ScrollViewer` so `MaxHeight` can't clip a control out of reach. The tab header names
   each section, so the in-page ALL-CAPS headings went with it. `SelectedTabIndex` persists via
   `AppConfig.SetupTab` (clamped on load), and opening Setup because of an update selects the Updates
@@ -56,7 +75,7 @@ awaiting its on-air test (see Open).
   is roughly three times the height of Updates. If that reads as jumpy in use, a `MinHeight` on the
   window is the knob.
 
-- **Self-install, ported from LP-100A** (unreleased) — `--install` / `--uninstall`, decisions pure and
+- **Self-install, ported from LP-100A** (v0.6.0-beta) — `--install` / `--uninstall`, decisions pure and
   tested in Core (`InstallLayout`, `InstallCommandLine`, `DesktopEntry`), side effects in
   `InstallService`. Per-user under `%LOCALAPPDATA%\Programs` as the updater requires; hand-unzipped
   copies adopted where they stand, including this station's `W2Monitor-win-x64`; settings named rather
@@ -75,7 +94,7 @@ awaiting its on-air test (see Open).
   Still open: the Linux half compiles, cross-publishes and is unit-tested, but none of its filesystem
   work has run on real hardware. The CM5 is where that gets settled.
 
-- **Avalonia 11.2.1 → 12.1.1, and the BCL packages the net10 retarget left behind** (unreleased) — every
+- **Avalonia 11.2.1 → 12.1.1, and the BCL packages the net10 retarget left behind** (v0.6.0-beta) — every
   prediction in the planned entry held, and the LP-100A notes were worth reading first:
   - **Zero source changes.** Build clean, no warnings. Its one deprecation there
     (`TextBox.Watermark`) isn't used here, so a major-version jump cost nothing in code.
@@ -96,7 +115,7 @@ awaiting its on-air test (see Open).
   and both phases of the alarm flash. Publish size +5%. Untested: linux-x64 and linux-arm64 are
   cross-published only, so the CM5 still owes this a real launch before anything ships on it.
 
-- **Setup list's status dots stuck on amber** (unreleased) — raised as "make the connection lights green
+- **Setup list's status dots stuck on amber** (v0.6.0-beta) — raised as "make the connection lights green
   rather than orange"; it was a refresh bug, not a colour choice, and the colours are unchanged. Amber
   means *port open, nothing decoded yet* (`StatusIsError ? Red : Current is not null ? Green : Amber`),
   which is exactly what you want to see when the meter is off, the baud is wrong, or the cable is in the
@@ -116,7 +135,7 @@ awaiting its on-air test (see Open).
   identical. Refreshing rows per frame was the alternative and would have rebuilt every row's label
   string several times a second for nothing.
 
-- **Minor hardening cluster** (unreleased) — five latent items, and checking them turned up that they
+- **Minor hardening cluster** (v0.6.0-beta) — five latent items, and checking them turned up that they
   were not equally real:
   - *Escaping exception on the supervisor thread — real, and the serious one.* `_stop.Wait()` throws
     `ObjectDisposedException` once `_stop` is disposed, `Supervise` had no `catch`, and an unhandled
@@ -140,7 +159,7 @@ awaiting its on-air test (see Open).
 
   `SerialReader` also picked up its first tests — 6 hardware-free lifecycle checks. 125 pass (+8).
 
-- **SensorLock released on any sub-threshold dip** (unreleased) — `Accept` dropped the lock the instant
+- **SensorLock released on any sub-threshold dip** (v0.5.1-beta) — `Accept` dropped the lock the instant
   the locked sampler read ≤ 0.5 W, but SSB/CW power dips below that *within* an over (syllables, CW
   elements), so the lock released mid-over and a stray > 0.5 W on the other sampler could capture the
   display. Release now needs `quietAfterFrames` (4) *consecutive* sub-threshold frames on the locked
@@ -149,14 +168,14 @@ awaiting its on-air test (see Open).
   swap still switches within `switchAfterFrames`. Constant still wants an on-air confirmation (see Open).
   (`SensorLock`, +4 tests.)
 
-- **Wedged `Open()` under `Guard` can orphan an open port** (unreleased) — an open that exceeded the
+- **Wedged `Open()` under `Guard` can orphan an open port** (v0.5.1-beta) — an open that exceeded the
   4 s watchdog was abandoned before `_port = port`, so if it later succeeded the handle leaked and the
   next reconnect could hit a self-inflicted "in use." Open and supervisor now hand the port over via
   an atomic claim (`OpenGuarded`): the side that loses the claim closes it, so a late open cleans up
   after itself. Busy-port failure path verified on real hardware (COM7 held by the running app →
   correct access-denied describe + 1 s retry backoff). (`SerialReader.OpenGuarded`, `CloseQuietly`.)
 
-- **`DetectAsync` has no try/catch** (unreleased) — fire-and-forget, so a throw from port enumeration
+- **`DetectAsync` has no try/catch** (v0.5.1-beta) — fire-and-forget, so a throw from port enumeration
   or `W2Probe.Detect` left Setup reading "Scanning ports…" forever with no error. Now wrapped; the
   failure lands on the Detect status line in red (`DetectStatusBrush`, mirroring the updater's bound
   brush). (`SetupViewModel`, `SetupWindow.axaml`.)

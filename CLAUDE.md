@@ -1,7 +1,7 @@
 # W2 Monitor (w2-monitor-x)
 
 Cross-platform desktop monitor for **Elecraft W2** RF power/SWR meters — multi-meter,
-full W2 control, TX-timeout timer, SWR alarm. **.NET 10 + Avalonia 11.2.1**, MVVM.
+full W2 control, TX-timeout timer, SWR alarm. **.NET 10 + Avalonia 12.1.1**, MVVM.
 Runs on Windows, Linux, and Raspberry Pi (arm64). GPLv3. By David Erickson (AB0R).
 
 This is the cross-platform successor to the retired PowerShell `w2-monitor`. It is the
@@ -14,8 +14,11 @@ dotnet build                                   # needs the .NET 10 SDK (pinned i
 dotnet run --project src/W2.App                # run the app (needs a desktop/DISPLAY)
 dotnet run --project src/W2.App -- --sim       # no hardware: drive UI from synthetic W2s
 dotnet run --project src/W2.App -- --setup     # open Setup on launch (debug)
-dotnet test                                    # xUnit suite — all pure W2.Core logic
+dotnet test                                    # xUnit suite — all pure W2.Core logic (168 tests)
 ```
+
+Runtime switches the app itself understands: `--sim`, `--setup`, and the install pair `--install` /
+`--uninstall` (both take `--quiet` for an unattended run). See *Self-install* below.
 
 Solution: `W2Monitor.sln`. Output assembly is `W2Monitor` (`W2Monitor.exe` on Windows).
 
@@ -31,15 +34,17 @@ dotnet publish src/W2.App -c Release -r win-x64   --self-contained -p:PublishSin
 ```
 src/
   W2.Core/   # NO UI. Serial + protocol + pure logic — this is where the tests live.
-             #   SerialReader (supervisor loop + watchdog), StreamFramer, W2FrameParser,
-             #   W2Wire (build wire strings), W2Reading, W2SimReader, W2Probe (Detect),
-             #   FocusPolicy, SensorLock (Search-mode steadying), TxTimer, LinkHealth,
-             #   SerialErrors, SerialDisplay, IReadingSource
+             #   Serial:  SerialReader (supervisor loop + watchdog), StreamFramer, W2FrameParser,
+             #            W2Wire (build wire strings), W2Reading, W2SimReader, W2Probe (Detect),
+             #            SerialErrors, SerialDisplay, LinkHealth, IReadingSource
+             #   Logic:   FocusPolicy, SensorLock (Search-mode steadying), TxTimer
+             #   Plumbing: AtomicFile (durable config writes), UpdateApplyScript
+             #   Install: InstallLayout (Installed/Portable/Loose), InstallCommandLine, DesktopEntry
   W2.App/    # Avalonia MVVM
              #   Services/  MeterManager (owns N meters), MeterService (per-meter model),
-             #              PortIdentity (cable pinning), UpdateService, AppConfig
+             #              PortIdentity (cable pinning), UpdateService, InstallService, AppConfig
              #   ViewModels/ MainWindow, Setup, ViewModelBase
-             #   Views/     MainWindow, SetupWindow, ConfirmWindow
+             #   Views/     MainWindow, SetupWindow (tabbed), ConfirmWindow
              #   Controls/  PowerSwrBar (stacked fwd bar + cyan peak-hold marker)
 tests/W2.Core.Tests/   # xUnit — Core logic only (no UI). Keep new logic testable here.
 ```
