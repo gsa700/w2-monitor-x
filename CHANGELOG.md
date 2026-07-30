@@ -5,6 +5,20 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+### Fixed
+- **A slow serial open can no longer orphan the port.** `Open()` runs under a 4 s watchdog so a
+  stale/removed FTDI can't stall the reconnect loop, but a wedged open that *later succeeded* left an
+  open handle nobody referenced — no field pointed at it, so only the finalizer would close it, and
+  the next reconnect attempt could hit a self-inflicted "port in use." The open and the supervisor
+  now hand the port over through an atomic claim: whichever side loses the claim closes it, so a
+  late-completing open cleans up after itself. A failed open also disposes its `SerialPort` instead
+  of dropping it on the floor. (`SerialReader.OpenGuarded`.)
+- **A failing Detect no longer hangs Setup on "Scanning ports…" forever.** `DetectAsync` is
+  fire-and-forget, so an exception from port enumeration or the probe was swallowed with the status
+  line stuck mid-scan and no error anywhere. It now reports `Detect failed: <reason>` in red — the
+  Detect status line got a bound brush to do it, matching the updater's. (`SetupViewModel`,
+  `SetupWindow.axaml`.)
+
 ## [0.5.0-beta] - 2026-07-20
 
 ### Changed

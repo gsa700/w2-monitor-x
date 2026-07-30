@@ -115,6 +115,9 @@ public sealed class SetupViewModel : ViewModelBase
     private string _detectStatus = "";
     public string DetectStatus { get => _detectStatus; private set => SetProperty(ref _detectStatus, value); }
 
+    private IBrush _detectStatusBrush = Palette.DimBrush;
+    public IBrush DetectStatusBrush { get => _detectStatusBrush; private set => SetProperty(ref _detectStatusBrush, value); }
+
     private MeterRow? _selectedRow;
     public MeterRow? SelectedRow
     {
@@ -175,30 +178,45 @@ public sealed class SetupViewModel : ViewModelBase
         if (row.Meter.IsConnected) row.Meter.Disconnect(); else row.Meter.Connect();
     }
 
+    /// <summary>
+    /// Scan for W2s (behind a confirmation — the probe can key a radio). Fired-and-forgotten from
+    /// <see cref="DetectCommand"/>, so nothing awaits the returned task: an escaping exception would
+    /// be swallowed and leave Setup reading "Scanning ports…" forever with no clue why. Everything
+    /// is inside the try so a throw from port enumeration or the probe lands on the status line.
+    /// </summary>
     private async Task DetectAsync()
     {
         if (Application.Current is not App app) return;
-        var ok = await app.ConfirmAsync("Detect W2 meters",
-            "Detect opens every free serial port and briefly asserts its control lines to look " +
-            "for a W2. This can momentarily key a radio or cycle other gear on a CAT/PTT port. " +
-            "Continue?");
-        if (!ok) return;
-
-        DetectStatus = "Scanning ports…";
-        var skip = _manager.Meters.Where(m => m.Port is not null)
-            .Select(m => m.Port!).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var found = await Task.Run(() => W2Probe.Detect(MeterService.GetPortNames(), skip));
-
-        var added = 0;
-        foreach (var port in found)
+        try
         {
-            if (_manager.Meters.Any(m => string.Equals(m.Port, port, StringComparison.OrdinalIgnoreCase))) continue;
-            var m = _manager.Add($"W2 #{_manager.Meters.Count + 1}", port);
-            m.Connect();
-            added++;
+            var ok = await app.ConfirmAsync("Detect W2 meters",
+                "Detect opens every free serial port and briefly asserts its control lines to look " +
+                "for a W2. This can momentarily key a radio or cycle other gear on a CAT/PTT port. " +
+                "Continue?");
+            if (!ok) return;
+
+            DetectStatus = "Scanning ports…";
+            DetectStatusBrush = Palette.DimBrush;
+            var skip = _manager.Meters.Where(m => m.Port is not null)
+                .Select(m => m.Port!).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var found = await Task.Run(() => W2Probe.Detect(MeterService.GetPortNames(), skip));
+
+            var added = 0;
+            foreach (var port in found)
+            {
+                if (_manager.Meters.Any(m => string.Equals(m.Port, port, StringComparison.OrdinalIgnoreCase))) continue;
+                var m = _manager.Add($"W2 #{_manager.Meters.Count + 1}", port);
+                m.Connect();
+                added++;
+            }
+            DetectStatus = added > 0 ? $"Found {added} new meter(s)." : "No new W2 meters found.";
+            RefreshPorts();
         }
-        DetectStatus = added > 0 ? $"Found {added} new meter(s)." : "No new W2 meters found.";
-        RefreshPorts();
+        catch (Exception ex)
+        {
+            DetectStatus = $"Detect failed: {ex.Message}";
+            DetectStatusBrush = Palette.RedBrush;
+        }
     }
 
     private void RefreshPorts()

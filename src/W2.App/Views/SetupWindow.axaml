@@ -40,7 +40,7 @@
 
     <Grid ColumnDefinitions="Auto,*">
       <Button Grid.Column="0" Content="Detect W2s…" Command="{Binding DetectCommand}"/>
-      <TextBlock Grid.Column="1" Text="{Binding DetectStatus}" Foreground="{StaticResource DimBrush}"
+      <TextBlock Grid.Column="1" Text="{Binding DetectStatus}" Foreground="{Binding DetectStatusBrush}"
                  VerticalAlignment="Center" Margin="10,0,0,0" TextTrimming="CharacterEllipsis"/>
     </Grid>
 

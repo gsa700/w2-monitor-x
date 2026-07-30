@@ -12,13 +12,6 @@ From the 2026-07-17 bug hunt — real findings not fixed in the 0.4.1 batch:
   stray > 0.5 W on the other sampler can then capture the display. Fix (if it visibly flickers on
   air): require a few consecutive sub-threshold frames before releasing, mirroring `_switchAfter`.
   Validate on real hardware before touching the tuned logic. (`SensorLock.cs:57`.)
-- **Wedged `Open()` under `Guard` can orphan an open port.** If `SerialPort.Open()` exceeds the 4 s
-  watchdog, `RunSession` returns before `_port = port`, but the abandoned thread still holds the
-  port; if that open later succeeds the handle leaks (only GC closes it) → the next reconnect can
-  hit a self-inflicted "in use." Have the guarded closure close its own port if it completes after
-  being abandoned. (`SerialReader.cs:146-166`.)
-- **`DetectAsync` has no try/catch.** Fire-and-forget; if `W2Probe.Detect` throws, Setup shows
-  "Scanning ports…" forever with no error. Wrap in try/catch → error status. (`SetupViewModel`.)
 - **Minor hardening (latent / low):** `SerialReader.Dispose` isn't idempotent and an unhandled
   exception can escape the supervisor thread if `Stop()`'s 3 s join times out; `ProbeToggleStates`
   uses an unanchored regex + `long.Parse` (vs `TryParse` elsewhere); `SerialDisplay.Shorten`
@@ -26,6 +19,18 @@ From the 2026-07-17 bug hunt — real findings not fixed in the 0.4.1 batch:
   flash timer won't restart if the control is ever re-parented (not reachable in the current layout).
 
 ## Done
+
+- **Wedged `Open()` under `Guard` can orphan an open port** (unreleased) — an open that exceeded the
+  4 s watchdog was abandoned before `_port = port`, so if it later succeeded the handle leaked and the
+  next reconnect could hit a self-inflicted "in use." Open and supervisor now hand the port over via
+  an atomic claim (`OpenGuarded`): the side that loses the claim closes it, so a late open cleans up
+  after itself. Busy-port failure path verified on real hardware (COM7 held by the running app →
+  correct access-denied describe + 1 s retry backoff). (`SerialReader.OpenGuarded`, `CloseQuietly`.)
+
+- **`DetectAsync` has no try/catch** (unreleased) — fire-and-forget, so a throw from port enumeration
+  or `W2Probe.Detect` left Setup reading "Scanning ports…" forever with no error. Now wrapped; the
+  failure lands on the Detect status line in red (`DetectStatusBrush`, mirroring the updater's bound
+  brush). (`SetupViewModel`, `SetupWindow.axaml`.)
 
 - **Reconnect status wording — suppress the transient dialout flash** (v0.4.1-beta) — during a
   replug the mid-re-enumeration open would throw `UnauthorizedAccessException` and surface the full

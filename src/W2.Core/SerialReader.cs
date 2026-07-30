@@ -137,18 +137,22 @@ public sealed class SerialReader : IReadingSource
         try { return resolvePort?.Invoke(); } catch { return null; }
     }
 
-    /// <summary>One connected session: open, poll until the link drops or we're stopped, then close.</summary>
-    private void RunSession(string portName)
+    /// <summary>
+    /// Open one port under the <see cref="Guard"/> watchdog, with an explicit ownership handoff so a
+    /// slow open can't orphan the handle. If the native <c>Open()</c> outruns the timeout the caller
+    /// abandons that thread — but the open may still succeed a moment later, and the resulting port
+    /// would then be held by nobody: no field references it, so only the finalizer would ever close
+    /// it, and the next reconnect attempt can hit a self-inflicted "port in use." So the opener and the
+    /// supervisor race for a single atomic claim, and whichever side loses it closes the port.
+    /// </summary>
+    private static (bool completed, Exception? error, SerialPort? port) OpenGuarded(string portName)
     {
-        _linkFaulted = false;
-        var health = new LinkHealth();
+        SerialPort? handoff = null;
+        var claim = 0;   // 0 = unclaimed, 1 = opener published it, 2 = caller abandoned the open
 
-        // Open under a watchdog: a healthy FTDI opens in well under a second, but a stale/removed
-        // node can block the native call — bound it so a bad port never stalls the reconnect loop.
-        SerialPort? port = null;
-        var (opened, openError) = Guard(() =>
+        var (completed, error) = Guard(() =>
         {
-            port = new SerialPort(portName, BaudRate, Parity.None, 8, StopBits.One)
+            var port = new SerialPort(portName, BaudRate, Parity.None, 8, StopBits.One)
             {
                 Handshake = Handshake.None,
                 DtrEnable = true,
@@ -157,8 +161,47 @@ public sealed class SerialReader : IReadingSource
                 WriteTimeout = ReplyTimeoutMs,
                 Encoding = Encoding.ASCII,
             };
-            port.Open();
+            try { port.Open(); }
+            catch { port.Dispose(); throw; }   // failed open: nothing to hand off, don't leak the object
+
+            // Publish before claiming: if our claim loses, the caller has already seen `handoff` (its
+            // own interlocked op fences the read) and closes it; if it wins, the caller never looks.
+            handoff = port;
+            if (Interlocked.CompareExchange(ref claim, 1, 0) == 0) return;
+
+            // The caller gave up on us. Nobody is watching this port, so close it here — this thread
+            // is already abandoned, so blocking on a removed device's Close() costs nothing.
+            handoff = null;
+            CloseQuietly(port);
         }, OpenTimeoutMs);
+
+        if (completed) return (true, error, handoff);
+
+        // Timed out. Take the claim so a late-completing open cleans up after itself; if the opener
+        // beat us to it, the port is ours and we close it — we've already blown the watchdog budget,
+        // so let the supervisor back off and start a fresh session rather than use it.
+        if (Interlocked.CompareExchange(ref claim, 2, 0) != 0 && handoff is { } late)
+            Guard(() => CloseQuietly(late), CloseTimeoutMs);
+
+        return (false, error, null);
+    }
+
+    /// <summary>Close and dispose a port, swallowing anything it throws. Can block if the device is gone.</summary>
+    private static void CloseQuietly(SerialPort port)
+    {
+        try { if (port.IsOpen) port.Close(); } catch { /* ignore */ }
+        try { port.Dispose(); } catch { /* ignore */ }
+    }
+
+    /// <summary>One connected session: open, poll until the link drops or we're stopped, then close.</summary>
+    private void RunSession(string portName)
+    {
+        _linkFaulted = false;
+        var health = new LinkHealth();
+
+        // Open under a watchdog: a healthy FTDI opens in well under a second, but a stale/removed
+        // node can block the native call — bound it so a bad port never stalls the reconnect loop.
+        var (opened, openError, port) = OpenGuarded(portName);
 
         if (!opened)
         {
@@ -307,11 +350,7 @@ public sealed class SerialReader : IReadingSource
         // Close under a watchdog: on Linux a surprise-removed FTDI can make Close()/Dispose() block
         // forever. If it wedges we abandon that thread (background — it unblocks once the device is
         // fully gone) rather than let it freeze reconnect or Stop().
-        Guard(() =>
-        {
-            try { if (port.IsOpen) port.Close(); } catch { /* ignore */ }
-            port.Dispose();
-        }, CloseTimeoutMs);
+        Guard(() => CloseQuietly(port), CloseTimeoutMs);
     }
 
     public void Dispose()
