@@ -9,6 +9,7 @@ using W2.App.Services;
 using W2.App.Settings;
 using W2.App.ViewModels;
 using W2.App.Views;
+using W2.Core;
 
 namespace W2.App;
 
@@ -44,6 +45,11 @@ public partial class App : Application
             _manager = new MeterManager(simulated);
             _setupVm = new SetupViewModel(_manager, _display) { CheckUpdatesAtStartup = _config.CheckUpdatesAtStartup };
 
+            // A copy installed by hand before there was an installer is adopted where it stands, so
+            // it appears in Installed apps without being copied to a second location.
+            if (!simulated)
+                try { InstallService.EnsureRegistered(); } catch { /* never block startup over this */ }
+
             if (simulated) BuildSimMeters();
             else RestoreMeters();
 
@@ -67,7 +73,19 @@ public partial class App : Application
                 .Any(a => a.Equals("--setup", StringComparison.OrdinalIgnoreCase));
             windows[0].Opened += async (_, _) =>
             {
+                // This run exists only to uninstall: ask, act, and go. Nothing else should start.
+                if (Program.PendingUninstall)
+                {
+                    await RunUninstallAsync();
+                    return;
+                }
+
                 for (var i = 1; i < windows.Count; i++) windows[i].Show();   // the primary is auto-shown
+
+                // A copy running from wherever it was unzipped offers to install itself.
+                if (!simulated && InstallService.Mode == InstallMode.Loose && await OfferInstallAsync())
+                    return;
+
                 if (openSetup || updateFailed) ShowSetup();
                 if (_config.CheckUpdatesAtStartup)
                 {
@@ -102,7 +120,8 @@ public partial class App : Application
             if (port is not null)
             {
                 m.Port = port;
-                if (MeterService.GetPortNames().Contains(port)) m.Connect();
+                // Don't take the serial ports for a run that exists only to uninstall.
+                if (!Program.PendingUninstall && MeterService.GetPortNames().Contains(port)) m.Connect();
             }
         }
     }
@@ -213,18 +232,115 @@ public partial class App : Application
     }
 
     /// <summary>Close every window so the staged update helper can swap the executable and relaunch.</summary>
-    public void ExitForUpdate()
+    public void ExitForUpdate() => CloseAllWindows();
+
+    /// <summary>
+    /// Close every window, which exits the app under <see cref="ShutdownMode.OnLastWindowClose"/>.
+    /// </summary>
+    private void CloseAllWindows()
     {
         _programmaticClose = true;   // every window is closing anyway; don't run the per-meter cascade
         foreach (var w in AllWindows().ToList()) w.Close();
     }
 
-    /// <summary>Modal yes/no confirmation, owned by whatever window is available.</summary>
-    public Task<bool> ConfirmAsync(string title, string message)
+    /// <summary>Modal confirmation, owned by whatever window is available.</summary>
+    /// <param name="negative">Null for a one-button message that only reports an outcome.</param>
+    public Task<bool> ConfirmAsync(string title, string message,
+        string affirmative = "Continue", string? negative = "Cancel", string? detail = null)
     {
         var owner = (Window?)_setupWindow ?? _focusWindow ?? _meterWindows.Values.FirstOrDefault();
-        var dlg = new ConfirmWindow(title, message) { Topmost = _display.AlwaysOnTop };
+        var dlg = new ConfirmWindow(title, message, affirmative, negative, detail) { Topmost = _display.AlwaysOnTop };
         return owner is not null ? dlg.ShowDialog<bool>(owner) : Task.FromResult(false);
+    }
+
+    private Task NotifyAsync(string title, string message, string? detail = null) =>
+        ConfirmAsync(title, message, affirmative: "OK", negative: null, detail: detail);
+
+    // --- install / uninstall ---
+
+    /// <summary>
+    /// Offer to install a copy that's running from wherever it was unzipped. Returns true when the
+    /// install happened and this process is handing over to the installed copy.
+    /// </summary>
+    private async Task<bool> OfferInstallAsync()
+    {
+        var accepted = await ConfirmAsync(
+            $"Install {InstallService.DisplayName}",
+            $"Install {InstallService.DisplayName} on this computer?",
+            affirmative: "Install",
+            negative: "Not now",
+            detail: $"Copies the program to {InstallService.InstallDirectory} and lists it in "
+                  + "Settings → Apps → Installed apps, with a Start Menu shortcut. Your meters and "
+                  + "settings are untouched either way.\n\n"
+                  + "To run from here permanently without being asked again, put a file named "
+                  + $"{InstallLayout.PortableMarker} beside the program.");
+
+        if (!accepted) return false;
+
+        try
+        {
+            var installed = InstallService.Install();
+
+            // Installed but not listed is a real outcome, not a detail: the program works, yet the
+            // usual way to remove it is missing. Say so here rather than report a clean install and
+            // leave it to be discovered later in Settings.
+            if (!installed.Registered)
+            {
+                await NotifyAsync(
+                    "Installed, but not listed",
+                    $"{InstallService.DisplayName} was installed to {InstallService.InstallDirectory}, "
+                    + "but could not be added to Settings → Apps → Installed apps.",
+                    "The program itself works normally — only the usual way to uninstall it is "
+                    + "missing. Installing again often clears it.");
+            }
+
+            InstallService.LaunchDetached(installed.ExePath);
+            CloseAllWindows();
+            return true;
+        }
+        catch (InstallBlockedException ex)
+        {
+            await NotifyAsync("Could not install", ex.Message);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            await NotifyAsync("Could not install", $"The install did not complete: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// The interactive <c>--uninstall</c> path, reached from the installed-apps entry. Asks what to
+    /// do about the settings, hands the deletion to a detached helper, and exits.
+    /// </summary>
+    private async Task RunUninstallAsync()
+    {
+        var confirmed = await ConfirmAsync(
+            $"Remove {InstallService.DisplayName}",
+            $"Remove {InstallService.DisplayName} from this computer?",
+            affirmative: "Remove",
+            negative: "Cancel",
+            detail: $"Deletes the program from {InstallService.InstallDirectory}.");
+
+        if (!confirmed) { CloseAllWindows(); return; }
+
+        // Asked separately, and declining is the safe button: the settings hold the meter list and
+        // each cable's chip-serial pinning, which is fiddly enough to redo that it shouldn't go
+        // along with the program by default. Closing the dialog also means "keep".
+        var removeSettings = await ConfirmAsync(
+            "Remove settings too?",
+            "Also delete your saved settings?",
+            affirmative: "Delete settings",
+            negative: "Keep settings",
+            detail: "The meter list, each cable's chip serial, window positions and display options, "
+                  + $"in {ConfigStore.DataDir}. Keeping them means a later install picks up where "
+                  + "you left off.");
+
+        try { InstallService.Uninstall(new UninstallOptions(removeSettings)); }
+        catch (Exception ex) { await NotifyAsync("Could not uninstall", ex.Message); }
+
+        CloseAllWindows();
     }
 
     private IEnumerable<Window> AllWindows()

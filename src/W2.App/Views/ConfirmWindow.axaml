@@ -9,9 +9,12 @@
 
   <StackPanel Margin="18,16" Spacing="16">
     <TextBlock x:Name="MessageText" TextWrapping="Wrap" Foreground="{StaticResource TextBrush}"/>
+    <!-- Secondary line for the consequences of the choice; collapsed unless one is supplied. -->
+    <TextBlock x:Name="DetailText" TextWrapping="Wrap" Foreground="{StaticResource DimBrush}"
+               IsVisible="False" FontSize="12"/>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-      <Button Content="Cancel" Click="OnCancel" Width="90"/>
-      <Button Content="Continue" Click="OnContinue" Width="90"/>
+      <Button x:Name="NegativeButton" Content="Cancel" Click="OnCancel" MinWidth="90"/>
+      <Button x:Name="AffirmativeButton" Content="Continue" Click="OnContinue" MinWidth="90"/>
     </StackPanel>
   </StackPanel>
 </Window>

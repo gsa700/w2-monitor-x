@@ -91,7 +91,12 @@ public static class ConfigStore
 {
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
 
-    private static string Path
+    /// <summary>
+    /// Where this app keeps its settings: <c>%AppData%\W2Monitor</c> on Windows, the XDG equivalent
+    /// elsewhere. Public because uninstall has to be able to offer to remove what's in here — and it
+    /// removes the files it names, never this directory wholesale.
+    /// </summary>
+    public static string DataDir
     {
         get
         {
@@ -99,9 +104,13 @@ public static class ConfigStore
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "W2Monitor");
             Directory.CreateDirectory(dir);
-            return System.IO.Path.Combine(dir, "config.json");
+            return dir;
         }
     }
+
+    public static string ConfigFilePath => System.IO.Path.Combine(DataDir, "config.json");
+
+    private static string Path => ConfigFilePath;
 
     public static AppConfig Load()
     {

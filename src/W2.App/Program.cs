@@ -12,15 +12,59 @@
 // the LICENSE file).  If not, see <https://www.gnu.org/licenses/>.
 
 using Avalonia;
+using W2.App.Services;
+using W2.Core;
 
 namespace W2.App;
 
 internal static class Program
 {
+    /// <summary>
+    /// An interactive <c>--uninstall</c> was asked for, so the UI starts solely to ask what to do
+    /// about the settings. Read by <see cref="App"/> once a window is up.
+    /// </summary>
+    public static bool PendingUninstall { get; private set; }
+
     // Avalonia entry point. Don't use any Avalonia/UI types before AppMain is called.
     [STAThread]
-    public static void Main(string[] args) =>
+    public static void Main(string[] args)
+    {
+        var request = InstallCommandLine.Parse(args);
+
+        // These run without a UI, so an exception here would surface as a crash dump rather than as
+        // anything a user could act on. Report through the exit code and go quietly instead.
+        try
+        {
+            switch (request.Action)
+            {
+                // Installing needs no UI: copy, register, and hand off to the installed copy.
+                case InstallAction.Install:
+                    var installed = InstallService.Install();
+                    if (!request.Quiet) InstallService.LaunchDetached(installed.ExePath);
+                    // The program is installed either way, so this is not a failure — but a script
+                    // that cares whether the app is removable can tell the difference.
+                    if (!installed.Registered) Environment.ExitCode = 2;
+                    return;
+
+                // An unattended uninstall has nobody to ask, so it takes only the program and leaves
+                // the meter list and cable pinning behind.
+                case InstallAction.Uninstall when request.Quiet:
+                    InstallService.Uninstall(new UninstallOptions(RemoveSettings: false));
+                    return;
+
+                case InstallAction.Uninstall:
+                    PendingUninstall = true;
+                    break;
+            }
+        }
+        catch (Exception)
+        {
+            Environment.ExitCode = 1;
+            return;
+        }
+
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    }
 
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<App>()
