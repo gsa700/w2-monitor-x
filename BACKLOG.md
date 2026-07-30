@@ -54,11 +54,15 @@ Dogfooding feedback and small improvements, batched into releases.
   *What removed it is unknown.* Deleting the old hand-installed folder afterwards touches no registry.
   No code path in this app deletes that key except `Uninstall`, which was not run.
 
-  *Worth doing regardless of cause:* have registration **rewrite rather than check-and-skip**, so any
-  later loss is repaired on the next launch. Doing that with the current design costs eleven `reg.exe`
-  spawns per start; generating a `.reg` file and running a single `reg import` makes it one spawn, and
-  incidentally makes the whole registration one thing for a security product to allow or block instead
-  of eleven. LP-100A shares this code and this weakness.
+  *Mitigated, not solved (unreleased).* Registration now rewrites on every launch instead of checking
+  and skipping, via `RegFile` (Core, pure, 10 tests) and a single `reg import` rather than eleven
+  `reg add` spawns. Verified twice on Windows — once through an adopted legacy folder and once on the
+  live install: delete the key, start the app normally, and it is back with every value intact,
+  embedded quotes and DWORDs included. So a future disappearance costs one restart rather than being
+  permanent and silent. **The cause is still unknown**, and this deliberately does not chase it; if the
+  entry starts vanishing repeatedly, that's the signal to look again with the tighter window this now
+  gives (it can only have gone missing since the last launch). LP-100A shares the original weakness and
+  wants the same change.
 
   **The evidence is gone** — the entry was repaired by hand so the install would be removable, so a
   fresh reproduction needs a clean install on another machine.

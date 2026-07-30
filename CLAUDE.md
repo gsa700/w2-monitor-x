@@ -133,9 +133,17 @@ name for the full rationale. No Inno/WiX/MSI and no new toolchain: the app insta
   serial. A quiet uninstall (what the installed-apps entry's own button runs) always keeps them,
   because Windows gives the user no way to answer a dialog it didn't expect.
 - **Registry goes through `reg.exe`, deliberately** — the registry APIs need `net10.0-windows`, and the
-  plain `net10.0` TFM is what lets one target cross-publish Linux and Pi. The entry is written,
-  verified, and rewritten once if the check fails: on LP-100A a spawn silently didn't take, leaving
-  the app installed but absent from Installed apps with no error anywhere.
+  plain `net10.0` TFM is what lets one target cross-publish Linux and Pi.
+- **Registration is one `reg import`, re-asserted every launch.** `RegFile` (Core, pure, tested) builds
+  a `.reg` file and `WriteUninstallEntry` imports it in a single spawn, instead of one `reg add` per
+  value. Two reasons, both learned the hard way: eleven spawns are eleven things that can individually
+  fail to happen with no way to tell a spawn that silently didn't take from one that did, and one
+  invocation is cheap enough to repeat on startup. `EnsureRegistered` therefore **rewrites rather than
+  checking and skipping** — the old early-out is exactly why a lost entry stayed lost, since the check
+  runs once at startup and the installed copy is launched right after a *successful* registration, so
+  it saw the entry present and skipped forever after. `RegisterUnix` likewise runs every launch and
+  skips only the steps whose result is already correct, so `update-desktop-database` isn't spawned
+  unless the entry's contents actually changed.
 - **The Linux icon is the 256px frame lifted verbatim from `app.ico`**, embedded as a plain
   `EmbeddedResource` because `--install` runs before Avalonia is initialised, so the asset loader
   isn't available. Regenerate it from `app.ico` rather than editing the two separately.

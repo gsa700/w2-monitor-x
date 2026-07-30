@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Threading;
 using W2.Core;
 
@@ -51,9 +52,13 @@ public sealed class InstallBlockedException(string message, Exception? inner = n
 /// </summary>
 public static class InstallService
 {
-    /// <summary>Registry key under HKCU that puts the app in Settings → Apps → Installed apps.</summary>
+    /// <summary>
+    /// Registry key under HKCU that puts the app in Settings → Apps → Installed apps. Spelled with
+    /// the full hive name because the <c>.reg</c> file format requires it; <c>reg.exe</c> accepts
+    /// either form on its command line, so one constant serves both.
+    /// </summary>
     private const string UninstallKey =
-        @"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\W2Monitor";
+        @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Uninstall\W2Monitor";
 
     /// <summary>Display name, used for the installed-apps entry and the Start Menu shortcut.</summary>
     public const string DisplayName = "W2 Monitor";
@@ -176,41 +181,73 @@ public static class InstallService
 
     /// <returns>Whether the desktop entry is on disk afterwards — the icon and the
     /// <c>~/.local/bin</c> symlink are conveniences, but without the entry there is no menu item.</returns>
+    /// <remarks>
+    /// Runs on every launch now, so each step skips itself when the result is already correct. The
+    /// cost that mattered was <c>update-desktop-database</c>, which is a process spawn and a directory
+    /// rebuild; it now runs only when the entry's contents actually changed.
+    /// </remarks>
     private static bool RegisterUnix(string exePath)
     {
-        // Write the icon first: the entry should not reference a file that isn't there yet.
+        // Write the icon first: the entry should not reference a file that isn't there yet. Only if
+        // it's missing — the bytes are baked into this build and can't have drifted.
         string? icon = null;
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(IconFilePath)!);
-            using var src = Assembly.GetExecutingAssembly().GetManifestResourceStream("app-icon.png");
-            if (src is not null)
+            if (File.Exists(IconFilePath))
             {
-                using var dst = File.Create(IconFilePath);
-                src.CopyTo(dst);
                 icon = IconFilePath;
+            }
+            else
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(IconFilePath)!);
+                using var src = Assembly.GetExecutingAssembly().GetManifestResourceStream("app-icon.png");
+                if (src is not null)
+                {
+                    using var dst = File.Create(IconFilePath);
+                    src.CopyTo(dst);
+                    icon = IconFilePath;
+                }
             }
         }
         catch (IOException) { /* an entry without an icon still launches */ }
         catch (UnauthorizedAccessException) { }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(DesktopFilePath)!);
-        File.WriteAllText(DesktopFilePath, DesktopEntry.Build(DisplayName, exePath, icon, Description));
+        var wanted = DesktopEntry.Build(DisplayName, exePath, icon, Description);
+        var current = TryReadAllText(DesktopFilePath);
+        if (current != wanted)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(DesktopFilePath)!);
+            File.WriteAllText(DesktopFilePath, wanted);
 
-        // Some environments only notice a new entry once the database is rebuilt; others watch the
-        // directory. Best effort, and harmless where the tool isn't installed.
-        Run("update-desktop-database", [Path.GetDirectoryName(DesktopFilePath)!]);
+            // Some environments only notice a changed entry once the database is rebuilt; others watch
+            // the directory. Best effort, and harmless where the tool isn't installed.
+            Run("update-desktop-database", [Path.GetDirectoryName(DesktopFilePath)!]);
+        }
 
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(SymlinkPath)!);
-            if (File.Exists(SymlinkPath) || Directory.Exists(SymlinkPath)) File.Delete(SymlinkPath);
-            File.CreateSymbolicLink(SymlinkPath, exePath);
+            // Replace the link only if it's missing or aimed somewhere else — an install directory
+            // that moved, say. Deleting and recreating an already-correct link every launch would be
+            // a pointless window in which the terminal command doesn't exist.
+            var target = File.ResolveLinkTarget(SymlinkPath, returnFinalTarget: false)?.FullName;
+            if (!InstallLayout.SamePath(target, exePath))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(SymlinkPath)!);
+                if (File.Exists(SymlinkPath) || Directory.Exists(SymlinkPath)) File.Delete(SymlinkPath);
+                File.CreateSymbolicLink(SymlinkPath, exePath);
+            }
         }
         catch (IOException) { /* the menu entry is the point; the symlink is a convenience */ }
         catch (UnauthorizedAccessException) { }
 
         return File.Exists(DesktopFilePath);
+    }
+
+    private static string? TryReadAllText(string path)
+    {
+        try { return File.Exists(path) ? File.ReadAllText(path) : null; }
+        catch (IOException) { return null; }
+        catch (UnauthorizedAccessException) { return null; }
     }
 
     private static void MakeExecutable(string path)
@@ -256,40 +293,75 @@ public static class InstallService
         return wrote && IsRegistered();
     }
 
-    /// <summary>Write every value of the installed-apps entry. False if any single write failed.</summary>
+    /// <summary>
+    /// Write the whole installed-apps entry in one <c>reg import</c>. Returns whether reg.exe said it
+    /// worked.
+    /// </summary>
+    /// <remarks>
+    /// One invocation rather than one per value, deliberately. Eleven separate <c>reg add</c> spawns
+    /// are eleven things that can individually fail to happen, and a spawn that silently doesn't take
+    /// is indistinguishable from one that did — which is the shape of the entry that was written and
+    /// then found missing (BACKLOG, 2026-07-30). It also makes the whole registration one action for a
+    /// security product to allow or block instead of eleven, and cheap enough to repeat on every
+    /// launch, which is what lets a lost entry heal itself.
+    ///
+    /// The file goes to the temp directory as UTF-16 with a BOM — <c>reg import</c> reads ANSI too,
+    /// but only Unicode survives a user profile path with non-ASCII characters in it.
+    /// </remarks>
     private static bool WriteUninstallEntry(string exePath, string dir)
     {
-        var version = UpdateService.CurrentVersion;
+        var values = new List<RegValue>
+        {
+            RegFile.Sz("DisplayName", DisplayName),
+            RegFile.Sz("DisplayVersion", UpdateService.CurrentVersion),
+            RegFile.Sz("Publisher", "David Erickson (AB0R)"),
+            RegFile.Sz("DisplayIcon", exePath),
+            RegFile.Sz("InstallLocation", dir),
+            RegFile.Sz("URLInfoAbout", $"https://github.com/{UpdateService.Repo}"),
+
+            // Windows gives the user no way to answer a dialog it did not expect, so the entry's own
+            // button runs the quiet path — which keeps the settings.
+            RegFile.Sz("UninstallString", $"\"{exePath}\" --uninstall"),
+            RegFile.Sz("QuietUninstallString", $"\"{exePath}\" --uninstall --quiet"),
+
+            RegFile.Dword("NoModify", 1),
+            RegFile.Dword("NoRepair", 1),
+        };
+
         var sizeKb = FileSizeKb(exePath);
+        if (sizeKb > 0) values.Add(RegFile.Dword("EstimatedSize", sizeKb));
 
-        var ok = RegSet(UninstallKey, "DisplayName", DisplayName);
-        ok &= RegSet(UninstallKey, "DisplayVersion", version);
-        ok &= RegSet(UninstallKey, "Publisher", "David Erickson (AB0R)");
-        ok &= RegSet(UninstallKey, "DisplayIcon", exePath);
-        ok &= RegSet(UninstallKey, "InstallLocation", dir);
-        ok &= RegSet(UninstallKey, "URLInfoAbout", $"https://github.com/{UpdateService.Repo}");
-
-        // Windows gives the user no way to answer a dialog it did not expect, so the entry's own
-        // button runs the quiet path — which keeps the settings.
-        ok &= RegSet(UninstallKey, "UninstallString", $"\"{exePath}\" --uninstall");
-        ok &= RegSet(UninstallKey, "QuietUninstallString", $"\"{exePath}\" --uninstall --quiet");
-
-        ok &= RegSet(UninstallKey, "NoModify", "1", "REG_DWORD");
-        ok &= RegSet(UninstallKey, "NoRepair", "1", "REG_DWORD");
-        if (sizeKb > 0) ok &= RegSet(UninstallKey, "EstimatedSize", sizeKb.ToString(), "REG_DWORD");
-
-        return ok;
+        var file = Path.Combine(Path.GetTempPath(), "w2monitor-register.reg");
+        try
+        {
+            File.WriteAllText(file, RegFile.Build(UninstallKey, values), new UnicodeEncoding(false, true));
+            return Run(RegExe, ["import", file]) == 0;
+        }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
+        finally
+        {
+            try { File.Delete(file); } catch { /* a leftover in temp is not worth failing over */ }
+        }
     }
 
     /// <summary>
-    /// Adopt a copy that is already sitting in an install directory but was put there by hand,
-    /// before there was an installer. Registers it where it stands rather than copying it to the
-    /// canonical folder, which would leave the original behind as an orphan.
+    /// Called at every startup. Adopts a copy that was put in an install directory by hand before
+    /// there was an installer — registering it where it stands rather than copying it to the
+    /// canonical folder, which would leave the original behind as an orphan — and re-asserts the
+    /// registration of an already-installed copy.
     /// </summary>
+    /// <remarks>
+    /// This used to return early when <see cref="IsRegistered"/> was true, and that is exactly why a
+    /// lost entry stayed lost: the check runs once at startup, the installed copy is launched
+    /// immediately after a *successful* registration, so it saw the entry present and skipped — and
+    /// nothing looks again for the rest of the process's life (BACKLOG, 2026-07-30). Re-asserting
+    /// costs one <c>reg import</c> on Windows, and <see cref="RegisterUnix"/> skips the work whose
+    /// result is already correct, so the price of self-healing is small enough to pay every launch.
+    /// </remarks>
     public static void EnsureRegistered()
     {
         if (Mode != InstallMode.Installed) return;
-        if (IsRegistered()) return;
         Register(ExePath);
     }
 
@@ -456,10 +528,6 @@ public static class InstallService
     /// one more thing that can differ between the contexts this runs in for no good reason.
     /// </summary>
     private static string RegExe => Path.Combine(Environment.SystemDirectory, "reg.exe");
-
-    /// <summary>Write one value, reporting whether reg.exe actually said it worked.</summary>
-    private static bool RegSet(string key, string name, string value, string type = "REG_SZ") =>
-        Run(RegExe, ["add", key, "/v", name, "/t", type, "/d", value, "/f"]) == 0;
 
     /// <summary>Run a console tool with no window and return its exit code (-1 if it wouldn't start).</summary>
     private static int Run(string fileName, IEnumerable<string> arguments)

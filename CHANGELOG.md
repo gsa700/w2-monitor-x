@@ -5,6 +5,16 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+### Fixed
+- **The Windows installed-apps entry repairs itself.** After a clean install of 0.6.0-beta the entry
+  was written correctly and then went missing, so the app stopped appearing in Settings → Apps →
+  Installed apps — the only route most people have to uninstall it. What removed it is still unknown,
+  but nothing noticed, because the check ran once at startup and the freshly installed copy had seen a
+  perfectly good entry a second earlier. Registration is now re-asserted on every launch, so an entry
+  lost at any point comes back the next time the app starts. It is also written as a single
+  `reg import` rather than eleven separate `reg` commands, which is both cheap enough to repeat and
+  one action for a security product to allow or block rather than eleven independent ones.
+
 ## [0.6.0-beta] - 2026-07-30
 
 Two new features and a major dependency jump. **The Linux and Raspberry Pi side of the installer has
