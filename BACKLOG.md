@@ -6,13 +6,27 @@ Dogfooding feedback and small improvements, batched into releases.
 
 From the 2026-07-17 bug hunt — real findings not fixed in the 0.4.1 batch:
 
-- **Confirm the SensorLock quiet-release constant on air.** The dip-release bug below is fixed, but
-  `quietAfterFrames: 4` (~0.8–1 s at the observed 4–5 frames/s) is a reasoned estimate, not a measured
-  one — it was validated by unit tests and a replayed SSB envelope, never on a live over. Two things
-  to watch on air: a pause longer than ~1 s while still holding PTT will release the lock (a stray
-  could then capture the display), and if the release feels sluggish when you swap antennas between
-  overs, the switch paths rather than this constant are what to look at. Adjust the constructor
-  default if either shows up. (`SensorLock`.)
+- **Confirm the SensorLock dip-release on a gapped signal** — partly verified; the remaining half needs
+  SSB or CW, not a carrier.
+
+  *Confirmed on air 2026-07-29* (W2 #1, Search mode): carrier on S2 locked the display to S2; keying S1
+  while S2 was still live did **not** move it; unkeying S2 handed over to S1 promptly, and alternating
+  between them switched fast. So the switch paths (`clearlyStronger` / `lockedWentQuiet`) are prompt and
+  the fix's bias toward holding the lock introduced no sluggishness — that was its main regression risk,
+  and it's clear.
+
+  *Still outstanding:* that test used a **carrier**, which never crosses the 0.5 W transmit floor, so it
+  drove only paths this fix left untouched and would have passed identically before it. The dip case
+  needs gaps in the signal — roughly 20 s of slowly-counted SSB (or moderate CW) on one sampler while
+  the other is cabled and picking up stray. The `S1`/`S2` label in the status line should hold for the
+  whole over; pre-fix it flicked to the idle sampler in the gaps, taking the power and SWR readings with
+  it. Then hold PTT through 2+ s of dead air: past about a second the lock releases by design, and a
+  stray capturing the display at that point means `quietAfterFrames: 4` is too tight — raise it (6–8) in
+  the constructor default.
+
+  *Caveat:* if the idle sampler shows no stray pickup at all while you transmit, this meter cannot
+  exhibit the original bug, and the honest result is "not reproducible here" rather than "fixed."
+  (`SensorLock`.)
 
 ## Done
 
