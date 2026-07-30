@@ -80,6 +80,14 @@ will never ask again or touch anything outside its own folder. Uninstalling keep
 unless you explicitly say otherwise, and `--install` / `--uninstall` work unattended if you'd rather
 script it.
 
+**Want a shortcut on your desktop?** Installing doesn't put one there — it registers the app with your
+Start Menu (Windows) or applications menu (Linux), and a desktop icon is a matter of taste. Make one
+with your OS's own tools:
+- **Windows:** find **W2 Monitor** in the Start Menu, then drag it to the desktop — or right-click the
+  installed `W2Monitor.exe` → **Show more options** → **Send to** → **Desktop (create shortcut)**.
+- **Linux:** use your desktop's "add to favorites / create launcher" option, or copy
+  `~/.local/share/applications/w2-monitor.desktop` to your `Desktop` folder and mark it trusted.
+
 ## Requirements
 
 - An **Elecraft W2** on a serial/USB (FTDI) port.
