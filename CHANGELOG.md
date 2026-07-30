@@ -5,6 +5,10 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+## [0.5.1-beta] - 2026-07-29
+
+Three fixes from the 2026-07-17 bug hunt, closing out that batch. No feature or protocol changes.
+
 ### Fixed
 - **Search-mode lock no longer drops out on a syllable gap.** The sampler lock released the moment the
   locked sampler read at or below the 0.5 W transmit floor — but SSB and CW both dip below that *within*
