@@ -37,7 +37,7 @@
 
   <ItemGroup>
     <!-- WMI for USB-serial chip-serial pinning (Windows-only; guarded at runtime) -->
-    <PackageReference Include="System.Management" Version="8.0.0" />
+    <PackageReference Include="System.Management" Version="10.0.10" />
   </ItemGroup>
 
   <ItemGroup>
