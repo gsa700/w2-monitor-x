@@ -28,6 +28,82 @@ From the 2026-07-17 bug hunt — real findings not fixed in the 0.4.1 batch:
   exhibit the original bug, and the honest result is "not reproducible here" rather than "fixed."
   (`SensorLock`.)
 
+## Planned
+
+David's list, 2026-07-29. His framing was "no particular order"; the order below is a recommendation
+with its reasoning attached, not a decision taken. The `lp100a-monitor` cross-references are the point
+of half of these — that project is the reference template for the station tools, and two of the four
+already exist there in working, tested form.
+
+**Keep the Avalonia bump out of the same release as the SensorLock change.** That fix is still awaiting
+its on-air test (see Open), and a renderer bump in the same build would muddy the result.
+
+1. **Connection dots read amber when they should read green — likely a refresh bug, not a palette
+   choice.** Amber does not mean "connected"; it means *port open, nothing decoded yet*
+   (`StatusIsError ? Red : Current is not null ? Green : Amber`). That is precisely the state worth
+   seeing when the meter is powered off, the baud is wrong, or the cable is in the wrong adapter, so
+   recolouring it green would delete a real diagnostic rather than fix anything. Suspected cause:
+   `MeterRow.DotBrush` refreshes only when `MeterManager.MetersChanged` fires, and a reading doesn't
+   fire it — `OnReading` raises it only when the *focus* changes. So the Setup list's dots freeze at
+   their last state-change value, which is the amber set during `Connect()` before the first reading
+   lands, while the main window's dot updates correctly via `FocusReadingUpdated`. **Confirm first:**
+   is the main-window dot green while the Setup list dots stay orange? If so, refresh the rows on
+   reading and leave the colours alone. Small; can ride along with the fixes already in `[Unreleased]`.
+
+2. **Avalonia 11.2.1 → 12.1.x, plus the BCL packages the net10 retarget left behind.** LP-100A made
+   this jump on 2026-07-28 — read *The .NET 10 + Avalonia 12 migration* in its `CLAUDE.md` before
+   starting, because the discovery cost is already paid there:
+   - Its only deprecation was `TextBox.Watermark` → `PlaceholderText`. W2 doesn't use `Watermark`
+     (checked), so this may be a zero-source-change bump.
+   - `Avalonia.Diagnostics` has **no 12.x — drop it, don't bump it.** Nothing here calls
+     `AttachDevTools` (only generated build props reference it), so the Debug-only package is dead
+     weight. This is also why it alone shows a `11.3.x` "latest" in `dotnet list package --outdated`.
+   - **It deletes the `Tmds.DBus.Protocol` pin.** Avalonia 12 pulls 0.94.1 transitively, which clears
+     GHSA-xrw6-gwf8-vvr9. Note the csproj comment's "do NOT jump to 0.9x" is correct only *under
+     Avalonia 11* — under 12 that is the version Avalonia itself resolves. Rewrite the comment as
+     history rather than silently dropping the pin, and re-check with
+     `dotnet list package --vulnerable --include-transitive`.
+   - **Port the `TrimNativeSymbols` target** from `Lp100a.App.csproj`. Avalonia 12's SkiaSharp and
+     HarfBuzzSharp ship native `.pdb` symbols (~101 MB combined) that do *not* bundle into the single
+     file — they land loose beside the exe. That matters twice over here, because this app's updater
+     contract is a true single file with natives bundled; getting it wrong is the v0.4.0-beta
+     crash-on-launch.
+   - `System.IO.Ports` and `System.Management` are still at **8.0.0** despite the net10 retarget;
+     LP-100A moved both to 10.0.10 in its net10 commit. `System.IO.Ports` is the serial library, so
+     Linux/Pi fixes may be sitting in it.
+
+   Split the commits (BCL, then Avalonia) so a regression points at one culprit, revalidate on all
+   three platforms, and expect roughly 7% publish-size growth.
+
+3. **Self-install, ported from LP-100A.** `InstallLayout` + `InstallCommandLine` + `DesktopEntry` in
+   Core (pure, unit-tested) with the side effects in the App layer — no Inno, WiX or MSI, and no new
+   toolchain. See *Self-install (Windows and Linux)* in LP-100A's `CLAUDE.md`.
+   - **Per-user under `%LOCALAPPDATA%\Programs` is a constraint, not a preference.**
+     `UpdateService.ApplyAndRestart` replaces the running executable in place, which needs no
+     elevation there and would need it on every update under `Program Files` — a machine-wide
+     installer quietly breaks the updater. This app runs the same updater, so the same constraint
+     binds. Don't "fix" the location without re-reading that method.
+   - **`LegacyFolders` must cover the hand-unzipped layouts**: `W2Monitor` plus `W2Monitor-win-x64`,
+     `-linux-x64`, `-linux-arm64`. The live Windows install sits in
+     `%LOCALAPPDATA%\Programs\W2Monitor-win-x64`, so without adoption the first run installs a second
+     copy and orphans the one actually in use.
+   - **Simpler here than there:** no transmission log. Most of LP-100A's uninstall care is protecting
+     `TXlog.csv`; this app has only `config.json` (plus its `.bak`), so the prompts collapse to one.
+   - Registry writes go through `reg.exe` deliberately — the registry APIs need `net10.0-windows`, and
+     the plain `net10.0` TFM is what lets one target cross-publish Linux and Pi.
+   - On uninstall, remove shared-directory items **file at a time**; never delete a directory the app
+     doesn't own. On Linux that mistake takes out every user binary on the machine.
+   - **Inherits an unverified half:** none of LP-100A's Linux filesystem work — icon extraction,
+     `.desktop` write, symlink, `chmod`, the `sh` uninstall trampoline — has run on real hardware. This
+     app is better placed to settle it, since it already runs on the CM5.
+
+4. **Tabbed Setup, as on LP-100A** (`Lp100a.App/Views/SetupWindow.axaml`: Connection / Display / Alarm
+   / Logging / Updates). The existing sections here map almost one-to-one onto **Meters / W2 Controls /
+   SWR Alarm / Display / Updates**, and there's room — this `SetupWindow.axaml` is 122 lines against
+   LP-100A's 198. Independent of the installer, which drives off a first-run prompt and the command
+   line and adds no Setup UI at all. Cheapest of the four and genuinely "whenever", but worth doing
+   *after* the Avalonia bump so Setup isn't laid out twice.
+
 ## Done
 
 - **Minor hardening cluster** (unreleased) — five latent items, and checking them turned up that they
