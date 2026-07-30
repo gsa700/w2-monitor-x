@@ -6,12 +6,13 @@ Dogfooding feedback and small improvements, batched into releases.
 
 From the 2026-07-17 bug hunt — real findings not fixed in the 0.4.1 batch:
 
-- **SensorLock releases on any sub-threshold dip (needs on-air check).** `SensorLock.Accept` drops
-  the lock the instant the locked sampler reads ≤ 0.5 W ("over ended → release"). SSB/CW power dips
-  below that between syllables/elements *within* an over, so the lock can release mid-over and a
-  stray > 0.5 W on the other sampler can then capture the display. Fix (if it visibly flickers on
-  air): require a few consecutive sub-threshold frames before releasing, mirroring `_switchAfter`.
-  Validate on real hardware before touching the tuned logic. (`SensorLock.cs:57`.)
+- **Confirm the SensorLock quiet-release constant on air.** The dip-release bug below is fixed, but
+  `quietAfterFrames: 4` (~0.8–1 s at the observed 4–5 frames/s) is a reasoned estimate, not a measured
+  one — it was validated by unit tests and a replayed SSB envelope, never on a live over. Two things
+  to watch on air: a pause longer than ~1 s while still holding PTT will release the lock (a stray
+  could then capture the display), and if the release feels sluggish when you swap antennas between
+  overs, the switch paths rather than this constant are what to look at. Adjust the constructor
+  default if either shows up. (`SensorLock`.)
 - **Minor hardening (latent / low):** `SerialReader.Dispose` isn't idempotent and an unhandled
   exception can escape the supervisor thread if `Stop()`'s 3 s join times out; `ProbeToggleStates`
   uses an unanchored regex + `long.Parse` (vs `TryParse` elsewhere); `SerialDisplay.Shorten`
@@ -19,6 +20,15 @@ From the 2026-07-17 bug hunt — real findings not fixed in the 0.4.1 batch:
   flash timer won't restart if the control is ever re-parented (not reachable in the current layout).
 
 ## Done
+
+- **SensorLock released on any sub-threshold dip** (unreleased) — `Accept` dropped the lock the instant
+  the locked sampler read ≤ 0.5 W, but SSB/CW power dips below that *within* an over (syllables, CW
+  elements), so the lock released mid-over and a stray > 0.5 W on the other sampler could capture the
+  display. Release now needs `quietAfterFrames` (4) *consecutive* sub-threshold frames on the locked
+  sampler, and any keyed frame resets the run. Replaying a 10 s SSB envelope with a 2 W stray: the old
+  rule showed the stray 3× and released mid-over 9×; the new one, zero of each — while a genuine antenna
+  swap still switches within `switchAfterFrames`. Constant still wants an on-air confirmation (see Open).
+  (`SensorLock`, +4 tests.)
 
 - **Wedged `Open()` under `Guard` can orphan an open port** (unreleased) — an open that exceeded the
   4 s watchdog was abandoned before `_port = port`, so if it later succeeded the handle leaked and the

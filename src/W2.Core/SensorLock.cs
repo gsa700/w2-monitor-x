@@ -13,6 +13,15 @@ namespace W2.Core;
 ///    other sampler is transmitting and the locked one has gone quiet for a few frames, we follow
 ///    the RF over to it. A far-stronger sampler switches immediately; a long unattributable run
 ///    releases the lock as a fail-safe. Pure and unit-tested; fed one (sampler, power) per cycle.
+///
+/// <b>Ending the over</b> takes a run of sub-threshold frames, not one. SSB and CW both drop below
+/// the transmit floor <i>within</i> an over — between syllables, and between CW elements/words — and
+/// releasing on the first such frame handed the display to any stray above the floor on the other
+/// sampler, the exact flicker this class exists to prevent. Releasing late costs almost nothing,
+/// because the two switch paths above already cover "RF genuinely moved," so the bias is toward
+/// holding on. Frames arrive at roughly 4–5/s (measured on real hardware), so the default 4 quiet
+/// frames is ~0.8–1 s of continuous silence — comfortably past SSB and CW word gaps, and still
+/// inside the 2 s TX hang that <c>MeterService</c> uses to decide an over has ended.
 /// </summary>
 public sealed class SensorLock
 {
@@ -20,18 +29,21 @@ public sealed class SensorLock
     private readonly double _switchMargin;
     private readonly int _switchAfter;
     private readonly int _releaseAfter;
+    private readonly int _quietAfter;
 
     private Sampler _locked = Sampler.Unknown;
     private double _lockedPeakW;
     private int _sinceLocked;   // frames since we last saw the locked sampler
+    private int _quiet;         // consecutive sub-threshold frames on the locked sampler
 
     public SensorLock(double transmitThresholdW = 0.5, double switchMargin = 1.5,
-        int switchAfterFrames = 3, int releaseAfterFrames = 30)
+        int switchAfterFrames = 3, int releaseAfterFrames = 30, int quietAfterFrames = 4)
     {
         _thresholdW = transmitThresholdW;
         _switchMargin = switchMargin;
         _switchAfter = switchAfterFrames;
         _releaseAfter = releaseAfterFrames;
+        _quietAfter = quietAfterFrames;
     }
 
     public Sampler Locked => _locked;
@@ -46,7 +58,7 @@ public sealed class SensorLock
 
         if (_locked == Sampler.Unknown)
         {
-            if (transmitting) { _locked = active; _lockedPeakW = power; _sinceLocked = 0; }
+            if (transmitting) Lock(active, power);
             return true;
         }
 
@@ -54,7 +66,9 @@ public sealed class SensorLock
         {
             _sinceLocked = 0;
             _lockedPeakW = Math.Max(_lockedPeakW, power);
-            if (!transmitting) { _locked = Sampler.Unknown; _lockedPeakW = 0; }   // over ended → release
+            // Sub-threshold here is a syllable/element gap until it persists — see the class remarks.
+            if (transmitting) _quiet = 0;
+            else if (++_quiet >= _quietAfter) Release();   // over really ended
             return true;
         }
 
@@ -64,18 +78,34 @@ public sealed class SensorLock
         var lockedWentQuiet = transmitting && _sinceLocked >= _switchAfter;           // RF moved to this sampler
         if (clearlyStronger || lockedWentQuiet)
         {
-            _locked = active; _lockedPeakW = power; _sinceLocked = 0;
+            Lock(active, power);
             return true;   // follow the RF over to this sampler
         }
 
         if (_sinceLocked >= _releaseAfter)   // fail-safe: haven't seen the locked sampler in a long time
         {
-            _locked = Sampler.Unknown; _lockedPeakW = 0; _sinceLocked = 0;
+            Release();
             return true;
         }
 
         return false;   // stray / idle sampler → ignore for display
     }
 
-    public void Reset() { _locked = Sampler.Unknown; _lockedPeakW = 0; _sinceLocked = 0; }
+    public void Reset() => Release();
+
+    private void Lock(Sampler active, double power)
+    {
+        _locked = active;
+        _lockedPeakW = power;
+        _sinceLocked = 0;
+        _quiet = 0;
+    }
+
+    private void Release()
+    {
+        _locked = Sampler.Unknown;
+        _lockedPeakW = 0;
+        _sinceLocked = 0;
+        _quiet = 0;
+    }
 }

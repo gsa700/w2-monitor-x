@@ -6,6 +6,15 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 ## [Unreleased]
 
 ### Fixed
+- **Search-mode lock no longer drops out on a syllable gap.** The sampler lock released the moment the
+  locked sampler read at or below the 0.5 W transmit floor — but SSB and CW both dip below that *within*
+  an over, between syllables and between CW elements. The lock could therefore release mid-over, and a
+  stray above the floor on the other sampler would capture the display: the exact flicker the lock exists
+  to prevent. Releasing now takes four *consecutive* sub-threshold frames on the locked sampler (~0.8–1 s
+  at the observed 4–5 frames/s), and any keyed frame resets the run. Releasing late costs little, since a
+  genuine antenna swap is followed by the existing switch paths rather than by the release. Replaying a
+  10 s SSB envelope against a 2 W stray, the old rule handed the display to the stray 3 times and released
+  mid-over 9 times; the new rule does neither. (`SensorLock`.)
 - **A slow serial open can no longer orphan the port.** `Open()` runs under a 4 s watchdog so a
   stale/removed FTDI can't stall the reconnect loop, but a wedged open that *later succeeded* left an
   open handle nobody referenced — no field pointed at it, so only the finalizer would close it, and

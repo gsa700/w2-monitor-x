@@ -37,14 +37,76 @@ public class SensorLockTests
     }
 
     [Fact]
-    public void Releases_when_the_over_ends()
+    public void Releases_once_the_over_has_really_ended()
     {
-        var s = new SensorLock();
+        var s = new SensorLock(quietAfterFrames: 4);
         s.Accept(Sampler.S1, 100.0);                // lock S1
         Assert.False(s.Accept(Sampler.S2, 0.5));    // stray ignored
-        Assert.True(s.Accept(Sampler.S1, 0.0));     // S1 drops → over ends, release
+
+        for (var i = 0; i < 3; i++)                 // quiet, but not yet long enough to be an ended over
+        {
+            Assert.True(s.Accept(Sampler.S1, 0.0));
+            Assert.Equal(Sampler.S1, s.Locked);
+        }
+
+        Assert.True(s.Accept(Sampler.S1, 0.0));     // 4th consecutive quiet frame → release
         Assert.Equal(Sampler.Unknown, s.Locked);
         Assert.True(s.Accept(Sampler.S2, 0.5));     // now free to follow either
+    }
+
+    [Fact]
+    public void A_syllable_gap_does_not_hand_the_display_to_a_stray()
+    {
+        // The reported bug: SSB/CW power dips below the transmit floor *within* an over — between
+        // syllables, and between CW elements. Releasing on that first quiet frame let a stray above
+        // the floor on the other sampler capture the display mid-over.
+        var s = new SensorLock();
+        Assert.True(s.Accept(Sampler.S1, 100.0));   // lock S1 on the over
+        Assert.True(s.Accept(Sampler.S1, 0.0));     // syllable gap — still our over
+        Assert.Equal(Sampler.S1, s.Locked);
+        Assert.False(s.Accept(Sampler.S2, 2.0));    // stray on the idle sampler → still ignored
+        Assert.True(s.Accept(Sampler.S1, 95.0));    // voice resumes on the real sampler
+        Assert.Equal(Sampler.S1, s.Locked);
+    }
+
+    [Fact]
+    public void Intermittent_dips_never_accumulate_to_a_release()
+    {
+        // CW: element gaps alternate with elements for the whole over. The quiet run has to reset on
+        // every keyed frame — counting them cumulatively would release the lock mid-stream.
+        var s = new SensorLock(quietAfterFrames: 4);
+        s.Accept(Sampler.S1, 100.0);
+        for (var i = 0; i < 20; i++)
+        {
+            Assert.True(s.Accept(Sampler.S1, 0.0));     // gap
+            Assert.True(s.Accept(Sampler.S1, 100.0));   // element
+        }
+        Assert.Equal(Sampler.S1, s.Locked);
+    }
+
+    [Fact]
+    public void Holding_through_a_dip_still_lets_rf_move_within_switch_after()
+    {
+        // The bias toward holding on must not delay a genuine move: S1 stops keying exactly as S2
+        // starts, and the switch path — not the release path — is what follows the RF over.
+        var s = new SensorLock(switchAfterFrames: 3, quietAfterFrames: 4);
+        s.Accept(Sampler.S1, 100.0);                 // lock S1
+        Assert.True(s.Accept(Sampler.S1, 0.0));      // S1 stops — quiet 1, lock still held
+        Assert.False(s.Accept(Sampler.S2, 60.0));    // S2 keys — locked sampler quiet 1 frame
+        Assert.False(s.Accept(Sampler.S2, 60.0));    // 2
+        Assert.True(s.Accept(Sampler.S2, 60.0));     // 3 → follow the RF to S2 despite the held lock
+        Assert.Equal(Sampler.S2, s.Locked);
+    }
+
+    [Fact]
+    public void The_next_over_on_the_other_antenna_captures_after_release()
+    {
+        var s = new SensorLock(quietAfterFrames: 4);
+        s.Accept(Sampler.S1, 100.0);
+        for (var i = 0; i < 4; i++) s.Accept(Sampler.S1, 0.0);   // over genuinely ends
+        Assert.Equal(Sampler.Unknown, s.Locked);
+        Assert.True(s.Accept(Sampler.S2, 80.0));                 // key the other antenna → locks S2
+        Assert.Equal(Sampler.S2, s.Locked);
     }
 
     [Fact]
