@@ -14,15 +14,28 @@ namespace W2.Core;
 /// </summary>
 public static class UpdateApplyScript
 {
-    public static string Windows(int pid, string stagedExe, string targetExe, string failedMarker) =>
+    /// <param name="workingDirectory">
+    /// Directory the relaunched app starts in — the install directory, never the staging one.
+    /// Without this the app inherits the helper's directory, and a directory held as a process's
+    /// working directory cannot be deleted: the staging folder then survives, and the *next*
+    /// update's clean-up of it throws, so updating twice without a restart in between fails.
+    /// </param>
+    /// <param name="stageRoot">Staging directory to remove once the swap is done.</param>
+    /// <param name="scriptPath">This script, removed last so it doesn't linger in temp.</param>
+    public static string Windows(int pid, string stagedExe, string targetExe, string failedMarker,
+        string workingDirectory, string stageRoot, string scriptPath) =>
         $"while (Get-Process -Id {pid} -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 300 }}\n" +
         $"Copy-Item -LiteralPath '{stagedExe}' -Destination '{targetExe}' -Force\n" +
         // Copy-Item is non-terminating; $? reflects whether it actually succeeded.
         $"if ($?) {{ Remove-Item -LiteralPath '{failedMarker}' -ErrorAction SilentlyContinue }}\n" +
         $"else {{ New-Item -ItemType File -Path '{failedMarker}' -Force | Out-Null }}\n" +
-        $"Start-Process -FilePath '{targetExe}'\n";
+        $"Start-Process -FilePath '{targetExe}' -WorkingDirectory '{workingDirectory}'\n" +
+        $"Remove-Item -LiteralPath '{stageRoot}' -Recurse -Force -ErrorAction SilentlyContinue\n" +
+        $"Remove-Item -LiteralPath '{scriptPath}' -Force -ErrorAction SilentlyContinue\n";
 
-    public static string Unix(int pid, string stagedExe, string targetExe, string failedMarker) =>
+    /// <inheritdoc cref="Windows"/>
+    public static string Unix(int pid, string stagedExe, string targetExe, string failedMarker,
+        string workingDirectory, string stageRoot, string scriptPath) =>
         "#!/bin/sh\n" +
         $"while kill -0 {pid} 2>/dev/null; do sleep 0.3; done\n" +
         // Relaunch of the new build is gated on cp succeeding; the else branch records the failure.
@@ -32,5 +45,8 @@ public static class UpdateApplyScript
         "else\n" +
         $"  : > '{failedMarker}'\n" +
         "fi\n" +
-        $"'{targetExe}' &\n";
+        // cd first, for the same reason -WorkingDirectory is set on Windows.
+        $"(cd '{workingDirectory}' && '{targetExe}' &)\n" +
+        $"rm -rf '{stageRoot}'\n" +
+        $"rm -f '{scriptPath}'\n";
 }

@@ -94,10 +94,17 @@ public static class UpdateService
         return info;
     }
 
+    /// <summary>
+    /// Temp directory the update is downloaded and unpacked into. The relaunched app must never have
+    /// this as its working directory: a directory in use as one cannot be deleted, so the clean-up
+    /// below would throw and updating twice without a restart would fail.
+    /// </summary>
+    private static string StageRoot => Path.Combine(Path.GetTempPath(), "W2Monitor-update");
+
     /// <summary>Download the asset zip, extract it, and return the path to the staged executable.</summary>
     public static async Task<string> DownloadAndStageAsync(string assetUrl)
     {
-        var tmp = Path.Combine(Path.GetTempPath(), "W2Monitor-update");
+        var tmp = StageRoot;
         if (Directory.Exists(tmp)) Directory.Delete(tmp, recursive: true);
         Directory.CreateDirectory(tmp);
 
@@ -129,13 +136,15 @@ public static class UpdateService
         var target = Environment.ProcessPath
             ?? throw new InvalidOperationException("Cannot determine the current executable path.");
         var pid = Environment.ProcessId;
-        var dir = Path.GetDirectoryName(stagedExe)!;
+        var targetDir = Path.GetDirectoryName(target)!;
         var marker = UpdateFailedMarkerPath(target);
 
+        // The helper lives in the temp root, not in the staging directory — it deletes that
+        // directory, and a script cannot sit in the folder it is removing.
         if (OperatingSystem.IsWindows())
         {
-            var ps1 = Path.Combine(dir, "apply-update.ps1");
-            File.WriteAllText(ps1, UpdateApplyScript.Windows(pid, stagedExe, target, marker));
+            var ps1 = Path.Combine(Path.GetTempPath(), "w2monitor-apply-update.ps1");
+            File.WriteAllText(ps1, UpdateApplyScript.Windows(pid, stagedExe, target, marker, targetDir, StageRoot, ps1));
             Process.Start(new ProcessStartInfo
             {
                 FileName = "powershell.exe",
@@ -146,8 +155,8 @@ public static class UpdateService
         }
         else
         {
-            var sh = Path.Combine(dir, "apply-update.sh");
-            File.WriteAllText(sh, UpdateApplyScript.Unix(pid, stagedExe, target, marker));
+            var sh = Path.Combine(Path.GetTempPath(), "w2monitor-apply-update.sh");
+            File.WriteAllText(sh, UpdateApplyScript.Unix(pid, stagedExe, target, marker, targetDir, StageRoot, sh));
             Process.Start(new ProcessStartInfo { FileName = "/bin/sh", Arguments = $"\"{sh}\"", UseShellExecute = false });
         }
     }
