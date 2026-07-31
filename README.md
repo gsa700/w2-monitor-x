@@ -46,9 +46,18 @@ Transmitting — live power and SWR with the cyan peak-hold marker riding the ba
 
 ![Transmitting into a dummy load](docs/transmitting.png)
 
-The Setup window — tabbed into Meters, W2 Controls, SWR Alarm, Display and Updates:
+The Setup window — tabbed into Meters, W2 Controls, SWR Alarm, Display and Updates. Each meter is
+listed with the USB chip serial of the cable it's on, so the two are told apart by hardware rather
+than by whichever COM port Windows handed out this week:
 
 ![The Setup window](docs/setup.png)
+
+The W2 Controls tab. The meter picker at the top is the same selection as the Meters tab — pick a
+meter in either place and both follow, so there's never a doubt about which W2 a button is about to
+act on. Lit buttons show the meter's current state: here W2 #1 has Auto Sensor, Auto Range and its
+sampler LEDs on, and is in PEP rather than average:
+
+![The W2 Controls tab](docs/controls.png)
 
 ## Install
 
