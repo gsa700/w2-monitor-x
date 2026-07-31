@@ -5,6 +5,11 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+## [0.6.2-beta] - 2026-07-31
+
+One fix, in the updater itself. Worth taking even though the failure is narrow, because it is the
+update path that carries every future fix.
+
 ### Fixed
 - **Updating twice without restarting in between no longer fails, and each update stops leaving ~100 MB
   behind.** The apply helper relaunched the app with no working directory of its own, so the new process
