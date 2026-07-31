@@ -26,6 +26,36 @@ Dogfooding feedback and small improvements, batched into releases.
   exhibit the original bug, and the honest result is "not reproducible here" rather than "fixed."
   (`SensorLock`.)
 
+- **Registration is skipped on the launch the updater performs (v0.6.2-beta, 2026-07-31).** After
+  updating 0.6.1 → 0.6.2 in place, the app was running 0.6.2 while the installed-apps entry still read
+  `DisplayVersion 0.6.1-beta`. The key's last-write time was 2026-07-30 17:55:52 — the *previous*
+  launch — so the write didn't merely record the wrong value, it never happened. `EstimatedSize` agreed,
+  recorded at 101844 KB against an exe now 101846 KB.
+
+  *Not a broken code path.* Launching the same installed binary normally rewrote the entry correctly
+  within seconds (`DisplayVersion 0.6.2-beta`, key written 18:32:45). `EnsureRegistered` is
+  unconditional, the registry write is the first thing `RegisterWindows` does, and `DisplayVersion`
+  reads the running assembly — all correct. It is specifically the updater's relaunch that doesn't get
+  there.
+
+  *Why nothing showed.* The failure is silent twice over: `WriteUninstallEntry` returns `false` rather
+  than throwing, `EnsureRegistered` ignores the return value, and the startup call is wrapped in
+  `catch { /* never block startup over this */ }`. There is no path by which a user or a later session
+  learns it didn't happen.
+
+  *Unresolved, and possibly the same fault as the entry that vanished below.* The 0.6.0 → 0.6.1 update
+  relaunch **did** write the key (17:55:52, one second after that launch), so it is not simply "update
+  relaunches never register" — it worked once and not the next time. Two candidates worth testing
+  before assuming a cause: whether the relaunch resolves the exe through a path that makes
+  `InstallLayout.Detect` return `Loose` (an 8.3 short path would defeat `SamePath`, which is
+  case-insensitive but not length-normalising), and whether something transient right after the exe is
+  replaced makes the `reg import` spawn fail.
+
+  *Worth doing regardless of cause:* stop discarding the result. `EnsureRegistered` should surface a
+  failed registration somewhere a person or a later session can see — the Updates tab is the natural
+  place — so the next occurrence produces evidence instead of forensics. Re-asserting when an update
+  completes, rather than only at startup, would also cover the exact launch that missed here.
+
 - **An installed-apps entry was written and then vanished (v0.6.0-beta, 2026-07-30).** After David's
   clean install to `%LOCALAPPDATA%\Programs\W2 Monitor`, the program and the Start Menu shortcut were
   both present but **the HKCU uninstall key was gone** — so the app did not appear in Settings → Apps →
