@@ -5,6 +5,16 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+### Fixed
+- **Updating twice without restarting in between no longer fails, and each update stops leaving ~100 MB
+  behind.** The apply helper relaunched the app with no working directory of its own, so the new process
+  inherited the helper's — the temp staging folder holding the unpacked release. Windows won't delete a
+  directory that is some process's working directory, so the staging folder survived every update; and
+  since an update begins by clearing that same folder, a second update in one session would have thrown
+  on it. The helper now starts the app in the install directory and lives in the temp root rather than
+  inside the folder it has to remove, because a script cannot delete the directory it is sitting in.
+  Ported from LP-100A Monitor, which hit this first. (`UpdateService`, `UpdateApplyScript`.)
+
 ## [0.6.1-beta] - 2026-07-30
 
 Follow-up to 0.6.0-beta: the tabbed Setup as it should have shipped, and the Windows installed-apps
