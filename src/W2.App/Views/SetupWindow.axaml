@@ -251,6 +251,13 @@
 
           <CheckBox Content="Check for updates at startup" IsChecked="{Binding CheckUpdatesAtStartup, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
 
+          <!-- Whether this copy is listed in the OS's installed-apps list. Shown for an installed
+               copy only, and worth showing even when it's fine: the fault it exists to catch is one
+               where nothing appears to be wrong. -->
+          <TextBlock Text="{Binding RegistrationStatus}" Foreground="{Binding RegistrationStatusBrush}"
+                     IsVisible="{Binding ShowRegistrationStatus}"
+                     FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
+
         </StackPanel>
       </ScrollViewer>
     </TabItem>

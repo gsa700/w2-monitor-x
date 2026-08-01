@@ -51,8 +51,18 @@ public partial class App : Application
 
             // A copy installed by hand before there was an installer is adopted where it stands, so
             // it appears in Installed apps without being copied to a second location.
+            //
+            // The updater's helper appends --updated when it relaunches, so the attempt is logged
+            // under the trigger that matters: registration has been observed to go missing on exactly
+            // that launch and on no other, and a log that couldn't tell it from an ordinary start
+            // would not have caught it (BACKLOG, 2026-07-31). EnsureRegistered records its own
+            // outcome now, including the skip and throw paths, so this catch is a backstop rather
+            // than the only thing standing between a failure and silence.
+            var updated = Environment.GetCommandLineArgs()
+                .Any(a => a.Equals("--updated", StringComparison.OrdinalIgnoreCase));
             if (!simulated)
-                try { InstallService.EnsureRegistered(); } catch { /* never block startup over this */ }
+                try { InstallService.EnsureRegistered(updated ? "update" : "startup"); }
+                catch { /* never block startup over this */ }
 
             if (simulated) BuildSimMeters();
             else RestoreMeters();

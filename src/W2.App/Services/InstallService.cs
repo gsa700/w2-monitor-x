@@ -176,8 +176,77 @@ public static class InstallService
     /// than duplicating.
     /// </summary>
     /// <returns>Whether the registration is verifiably in place afterwards.</returns>
-    public static bool Register(string exePath) =>
-        OperatingSystem.IsWindows() ? RegisterWindows(exePath) : RegisterUnix(exePath);
+    public static bool Register(string exePath) => Register(exePath, "install");
+
+    /// <summary>
+    /// Register, and record what happened. <paramref name="trigger"/> is what prompted the attempt —
+    /// <c>startup</c>, <c>install</c> or <c>update</c> — which is the field that matters, because the
+    /// fault being chased is specific to one of them.
+    /// </summary>
+    /// <remarks>
+    /// Every path through here writes exactly one line, including the paths that previously returned
+    /// false or threw with nothing to show for it. That is the point: an attempt that leaves no trace
+    /// is indistinguishable from one that never happened, which is what made this take a registry
+    /// last-write timestamp to diagnose (BACKLOG, 2026-07-31).
+    /// </remarks>
+    public static bool Register(string exePath, string trigger)
+    {
+        var detail = "";
+        var ok = false;
+        try
+        {
+            ok = OperatingSystem.IsWindows()
+                ? RegisterWindows(exePath, out detail)
+                : RegisterUnix(exePath, out detail);
+        }
+        catch (Exception ex)
+        {
+            // Nothing here rethrows: registration has never been worth failing an install or a
+            // startup over. It is worth *recording*, which is the part that was missing.
+            detail = $"threw {ex.GetType().Name}: {ex.Message}";
+        }
+        RecordAttempt(trigger, ok, detail);
+        return ok;
+    }
+
+    /// <summary>The most recent attempt this process made, or the last one on file if it hasn't tried yet.</summary>
+    public static RegistrationAttempt? LastAttempt
+    {
+        get
+        {
+            if (_lastAttempt is not null) return _lastAttempt;
+            try
+            {
+                if (!File.Exists(LogFilePath)) return null;
+                return File.ReadAllLines(LogFilePath)
+                    .Select(RegistrationLog.Parse)
+                    .LastOrDefault(a => a is not null);
+            }
+            catch (IOException) { return null; }
+            catch (UnauthorizedAccessException) { return null; }
+        }
+    }
+
+    private static RegistrationAttempt? _lastAttempt;
+
+    /// <summary>Audit trail of registration attempts, beside the config it diagnoses alongside.</summary>
+    public static string LogFilePath => Path.Combine(ConfigStore.DataDir, "registration.log");
+
+    private static void RecordAttempt(string trigger, bool succeeded, string detail)
+    {
+        var attempt = new RegistrationAttempt(
+            DateTime.UtcNow, UpdateService.CurrentVersion, trigger, succeeded, detail);
+        _lastAttempt = attempt;
+
+        try
+        {
+            var existing = File.Exists(LogFilePath) ? File.ReadAllLines(LogFilePath) : [];
+            var kept = RegistrationLog.Tail(existing.Append(RegistrationLog.Format(attempt)));
+            File.WriteAllLines(LogFilePath, kept);
+        }
+        catch (IOException) { /* the in-memory copy still reaches the UI */ }
+        catch (UnauthorizedAccessException) { }
+    }
 
     /// <returns>Whether the desktop entry is on disk afterwards — the icon and the
     /// <c>~/.local/bin</c> symlink are conveniences, but without the entry there is no menu item.</returns>
@@ -186,8 +255,9 @@ public static class InstallService
     /// cost that mattered was <c>update-desktop-database</c>, which is a process spawn and a directory
     /// rebuild; it now runs only when the entry's contents actually changed.
     /// </remarks>
-    private static bool RegisterUnix(string exePath)
+    private static bool RegisterUnix(string exePath, out string detail)
     {
+        var steps = new List<string>();
         // Write the icon first: the entry should not reference a file that isn't there yet. Only if
         // it's missing — the bytes are baked into this build and can't have drifted.
         string? icon = null;
@@ -211,6 +281,7 @@ public static class InstallService
         }
         catch (IOException) { /* an entry without an icon still launches */ }
         catch (UnauthorizedAccessException) { }
+        if (icon is null) steps.Add("no icon");
 
         var wanted = DesktopEntry.Build(DisplayName, exePath, icon, Description);
         var current = TryReadAllText(DesktopFilePath);
@@ -218,10 +289,15 @@ public static class InstallService
         {
             Directory.CreateDirectory(Path.GetDirectoryName(DesktopFilePath)!);
             File.WriteAllText(DesktopFilePath, wanted);
+            steps.Add("entry rewritten");
 
             // Some environments only notice a changed entry once the database is rebuilt; others watch
             // the directory. Best effort, and harmless where the tool isn't installed.
             Run("update-desktop-database", [Path.GetDirectoryName(DesktopFilePath)!]);
+        }
+        else
+        {
+            steps.Add("entry already current");
         }
 
         try
@@ -233,10 +309,13 @@ public static class InstallService
             // any launch. Symlink.ResolveTarget answers "no link" with null for that reason.
             Symlink.Ensure(SymlinkPath, exePath);
         }
-        catch (IOException) { /* the menu entry is the point; the symlink is a convenience */ }
-        catch (UnauthorizedAccessException) { }
+        catch (IOException ex) { steps.Add($"symlink failed: {ex.Message}"); }
+        catch (UnauthorizedAccessException ex) { steps.Add($"symlink failed: {ex.Message}"); }
 
-        return File.Exists(DesktopFilePath);
+        var ok = File.Exists(DesktopFilePath);
+        if (!ok) steps.Add("no .desktop entry on disk afterwards");
+        detail = string.Join("; ", steps);
+        return ok;
     }
 
     private static string? TryReadAllText(string path)
@@ -271,22 +350,29 @@ public static class InstallService
     /// still copied the program and still launched — it simply did not appear in Settings → Apps →
     /// Installed apps, which is the one route a user has to remove it.
     /// </remarks>
-    private static bool RegisterWindows(string exePath)
+    private static bool RegisterWindows(string exePath, out string detail)
     {
-        if (!OperatingSystem.IsWindows()) return false;
+        detail = "";
+        if (!OperatingSystem.IsWindows()) { detail = "not Windows"; return false; }
 
         var dir = Path.GetDirectoryName(exePath)!;
 
-        var wrote = WriteUninstallEntry(exePath, dir);
-        if (!wrote || !IsRegistered())
+        var wrote = WriteUninstallEntry(exePath, dir, out var importExit);
+        var verified = wrote && IsRegistered();
+        var retried = false;
+        if (!verified)
         {
+            retried = true;
             Thread.Sleep(250);
-            wrote = WriteUninstallEntry(exePath, dir);
+            wrote = WriteUninstallEntry(exePath, dir, out importExit);
+            verified = wrote && IsRegistered();
         }
 
         CreateShortcut(StartMenuShortcut, exePath, dir, Description);
 
-        return wrote && IsRegistered();
+        detail = $"reg import exit {importExit}{(retried ? ", after retry" : "")}" +
+                 (verified ? "" : wrote ? ", but the verify query found no entry" : "");
+        return verified;
     }
 
     /// <summary>
@@ -304,8 +390,9 @@ public static class InstallService
     /// The file goes to the temp directory as UTF-16 with a BOM — <c>reg import</c> reads ANSI too,
     /// but only Unicode survives a user profile path with non-ASCII characters in it.
     /// </remarks>
-    private static bool WriteUninstallEntry(string exePath, string dir)
+    private static bool WriteUninstallEntry(string exePath, string dir, out int importExit)
     {
+        importExit = -1;
         var values = new List<RegValue>
         {
             RegFile.Sz("DisplayName", DisplayName),
@@ -331,10 +418,12 @@ public static class InstallService
         try
         {
             File.WriteAllText(file, RegFile.Build(UninstallKey, values), new UnicodeEncoding(false, true));
-            return Run(RegExe, ["import", file]) == 0;
+            importExit = Run(RegExe, ["import", file]);
+            return importExit == 0;
         }
-        catch (IOException) { return false; }
-        catch (UnauthorizedAccessException) { return false; }
+        // -2 and -3 mark "never got as far as reg.exe", which reads differently from an exit code.
+        catch (IOException) { importExit = -2; return false; }
+        catch (UnauthorizedAccessException) { importExit = -3; return false; }
         finally
         {
             try { File.Delete(file); } catch { /* a leftover in temp is not worth failing over */ }
@@ -355,10 +444,19 @@ public static class InstallService
     /// costs one <c>reg import</c> on Windows, and <see cref="RegisterUnix"/> skips the work whose
     /// result is already correct, so the price of self-healing is small enough to pay every launch.
     /// </remarks>
-    public static void EnsureRegistered()
+    /// <param name="trigger">
+    /// What prompted this launch. The app passes <c>update</c> when it has just been replaced in
+    /// place, because that is the launch on which registration has been observed to go missing, and a
+    /// log that doesn't distinguish it from an ordinary start would not have caught it.
+    /// </param>
+    public static void EnsureRegistered(string trigger = "startup")
     {
-        if (Mode != InstallMode.Installed) return;
-        Register(ExePath);
+        if (Mode != InstallMode.Installed)
+        {
+            RecordAttempt(trigger, false, $"skipped: mode is {Mode}, not Installed");
+            return;
+        }
+        Register(ExePath, trigger);
     }
 
     /// <summary>

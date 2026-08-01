@@ -294,6 +294,24 @@ public sealed class SetupViewModel : ViewModelBase
     private IBrush _updateStatusBrush = Palette.DimBrush;
     public IBrush UpdateStatusBrush { get => _updateStatusBrush; private set => SetProperty(ref _updateStatusBrush, value); }
 
+    /// <summary>
+    /// What the last registration attempt did. Shown only for an installed copy — a loose or portable
+    /// one is not registered by design, and reporting on it would read as a fault.
+    /// </summary>
+    /// <remarks>
+    /// Read once when Setup opens rather than bound live: the interesting attempt happened during
+    /// startup, long before anyone opened this tab, so there is nothing to keep up with.
+    /// </remarks>
+    public bool ShowRegistrationStatus => InstallService.Mode == InstallMode.Installed;
+
+    public string RegistrationStatus =>
+        RegistrationLog.Describe(InstallService.LastAttempt, UpdateService.CurrentVersion);
+
+    public IBrush RegistrationStatusBrush =>
+        InstallService.LastAttempt is { Succeeded: false } ? Palette.RedBrush
+        : InstallService.LastAttempt is { } a && a.Version != UpdateService.CurrentVersion ? Palette.AmberBrush
+        : Palette.DimBrush;
+
     private bool _updateAvailable;
     public bool UpdateAvailable
     {
