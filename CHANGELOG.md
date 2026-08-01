@@ -5,6 +5,15 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+## [0.7.0-beta] - 2026-07-31
+
+Shaken down on a Raspberry Pi CM5 with two W2s connected. The headline is that the Linux install
+finally creates its `~/.local/bin` symlink — it never had, on any launch, since the self-installer
+landed in v0.6.0-beta. The rest came out of chasing a suspected peak bug that turned out not to be
+one: two meters reporting an identical peak looked like cross-talk, but keying one meter alone showed
+the readings were per-meter and correct all along. What was actually wrong was how little the display
+said about the number it was showing.
+
 ### Added
 - **"Reset all peaks"** on Setup → Display, beside the per-meter reset and shown only when more than
   one meter is configured. The focus window now reports a figure drawn from every connected meter, so
