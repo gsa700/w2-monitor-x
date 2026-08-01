@@ -197,7 +197,23 @@
             <CheckBox Grid.Row="3" Grid.Column="1" Content="Always on top" IsChecked="{Binding Display.AlwaysOnTop, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
           </Grid>
 
-          <Button Content="Reset peak forward" Command="{Binding ResetPeakCommand}" HorizontalAlignment="Left"/>
+          <!-- Same picker, same SelectedRow, as the W2 Controls and SWR Alarm tabs. It sits down here
+               with the buttons rather than at the head of the tab because only these two are
+               per-meter — the checkboxes above and the timeout below are global display settings, and
+               a picker at the top would wrongly imply they were per-meter too. -->
+          <StackPanel Spacing="8">
+            <TextBlock Text="Peak reset acts on the meter selected below."
+                       Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
+
+            <ListBox Classes="picker" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                     AutomationProperties.Name="Meter to reset"/>
+
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
+              <Button Content="Reset peak forward" Command="{Binding ResetPeakCommand}"/>
+              <Button Content="Reset all peaks" Command="{Binding ResetAllPeaksCommand}"
+                      IsVisible="{Binding MultipleMeters}"/>
+            </StackPanel>
+          </StackPanel>
 
           <Grid ColumnDefinitions="Auto,Auto,*">
             <TextBlock Grid.Column="0" Text="TX timeout (s)" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" Margin="0,0,10,0"/>

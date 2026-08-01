@@ -43,7 +43,10 @@ public sealed class SetupViewModel : ViewModelBase
         AlarmUpCommand = new RelayCommand(() => SelectedRow?.Meter.AlarmTripUp(), () => CanControl);
         AlarmLockCommand = new RelayCommand(() => SelectedRow?.Meter.ToggleAlarmLock(), () => CanControl);
         ResetAlarmCommand = new RelayCommand(() => SelectedRow?.Meter.ResetAlarm(), () => CanControl);
-        ResetPeakCommand = new RelayCommand(() => SelectedRow?.Meter.ResetPeak());
+        ResetPeakCommand = new RelayCommand(() => SelectedRow?.Meter.ResetPeak(), () => SelectedRow is not null);
+        ResetAllPeaksCommand = new RelayCommand(
+            () => { foreach (var m in _manager.Meters) m.ResetPeak(); },
+            () => _manager.Meters.Count > 0);
 
         UpdateCommand = new RelayCommand(() => _ = UpdateButtonAsync(), () => !_updateBusy);
         OpenReleaseCommand = new RelayCommand(OpenRelease);
@@ -98,6 +101,7 @@ public sealed class SetupViewModel : ViewModelBase
     public RelayCommand AlarmLockCommand { get; }
     public RelayCommand ResetAlarmCommand { get; }
     public RelayCommand ResetPeakCommand { get; }
+    public RelayCommand ResetAllPeaksCommand { get; }
 
     /// <summary>Selected meter's SWR-alarm state, for the Setup alarm controls.</summary>
     public string AlarmTripLabel => SelectedRow?.Meter?.AlarmTrip is { } t ? $"SWR {t:0.0}" : "SWR —";
@@ -159,6 +163,7 @@ public sealed class SetupViewModel : ViewModelBase
 
             RemoveCommand.RaiseCanExecuteChanged();
             ToggleConnectCommand.RaiseCanExecuteChanged();
+            ResetPeakCommand.RaiseCanExecuteChanged();
             OnPropertyChanged(nameof(ToggleConnectLabel));
             RefreshControls();
         }
@@ -270,6 +275,8 @@ public sealed class SetupViewModel : ViewModelBase
         OnPropertyChanged(nameof(ToggleConnectLabel));
         OnPropertyChanged(nameof(MultipleMeters));
         ToggleConnectCommand.RaiseCanExecuteChanged();
+        ResetPeakCommand.RaiseCanExecuteChanged();
+        ResetAllPeaksCommand.RaiseCanExecuteChanged();
         RefreshControls();
     }
 

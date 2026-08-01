@@ -149,7 +149,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
         ReflectedText = m.LastReflectedW is { } refl ? $"{refl:0.0} W" : "— W";
         ReturnLossText = m.Current?.ReturnLossDb is { } rl ? $"{rl:0.0} dB" : "— dB";
-        PeakText = $"{m.SessionPeakW:0.0} W";
+        PeakText = $"{PeakToShow(m):0.0} W";
         AlarmTripValue = m.AlarmTrip ?? 0;
         SwrAlarm = m.Alarm;
 
@@ -160,6 +160,23 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
         UpdateTx();
     }
+
+    /// <summary>
+    /// Which session peak this window reports. A dedicated window owns one meter, so it shows that
+    /// meter's own. The focus window stands in for all of them and follows whichever is keying, so
+    /// showing only the focused meter's peak would make the figure appear to drop the moment focus
+    /// moved to a quieter meter; it reports the highest any connected meter has reached instead.
+    /// </summary>
+    /// <remarks>
+    /// Only the printed peak is combined. <see cref="HeldPeakValue"/> — the cyan marker riding the
+    /// power bar — stays the focused meter's, because the bar underneath it is that meter's live
+    /// forward power and a marker from a different meter would be pointing at nothing.
+    /// </remarks>
+    private double PeakToShow(MeterService m) =>
+        _pinned is not null || _manager is null
+            ? m.SessionPeakW
+            : PeakPolicy.Combined(
+                _manager.Meters.Select(x => new MeterPeakState(x.IsConnected, x.SessionPeakW)).ToList());
 
     /// <summary>TX timer text + color, incl. the yellow→flashing-red timeout states.</summary>
     private void UpdateTx()

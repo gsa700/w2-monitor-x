@@ -5,7 +5,31 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+### Added
+- **"Reset all peaks"** on Setup → Display, beside the per-meter reset and shown only when more than
+  one meter is configured. The focus window now reports a figure drawn from every connected meter, so
+  there had to be one action that clears what it is actually showing.
+
+### Changed
+- **The single focus window reports the highest peak among the connected meters, not just the focused
+  meter's.** That window follows whichever meter is keying, so a peak belonging only to the focused
+  meter appeared to fall the moment focus moved to a quieter one. Per-meter windows are unchanged —
+  each still shows its own meter's peak, which is the whole point of a window dedicated to one meter.
+  Only the printed figure combines: the cyan peak-hold marker stays the focused meter's, because the
+  bar beneath it is that meter's live forward power and a marker from another meter would point at
+  nothing. Disconnected meters are excluded, so unplugging the meter holding the maximum lowers the
+  figure — deliberately, since this is the peak across what is being measured now rather than a high
+  score for the session. (`PeakPolicy` in W2.Core, unit-tested.)
+
 ### Fixed
+- **"Reset peak forward" now shows which meter it will reset.** It acts on the meter selected in
+  Setup, which has been correct since v0.4.1-beta, but the button sits on the **Display** tab while
+  that selection lives on the **Meters** tab — so nothing on screen said which meter it would hit,
+  and with one window open per meter the natural reading was "the meter I'm looking at." Display now
+  carries the same meter picker the W2 Controls and SWR Alarm tabs use, bound to the same
+  `SelectedRow`, so the choice cannot drift. It sits beside the reset buttons rather than at the head
+  of the tab, because only those are per-meter — the display checkboxes and the TX timeout are
+  global. The button is also disabled when no meter is selected.
 - **The `~/.local/bin/w2-monitor` symlink is created on Linux.** It never was — not on first install,
   not on any later launch. The installer probed for an existing link with `File.ResolveLinkTarget`
   before deciding whether to create one, and that call throws `FileNotFoundException` when nothing is
