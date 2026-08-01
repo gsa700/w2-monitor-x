@@ -59,6 +59,26 @@ sampler LEDs on, and is in PEP rather than average:
 
 ![The W2 Controls tab](docs/controls.png)
 
+### On Linux and Raspberry Pi
+
+The same build on a **Raspberry Pi CM5** — arm64, labwc/Wayland — with the layout and behavior
+identical to the Windows shots above. These come from the built-in simulator (`--sim`), which drives
+the UI from synthetic W2s, so the readings are generated rather than off-air:
+
+![Transmitting, on a Raspberry Pi CM5](docs/linux-transmitting.png)
+
+The SWR alarm firing. Past the trip point the SWR bar turns red and the alarm replaces the status
+line — the same condition that drives the W2's rear-panel keyline-disconnect relay:
+
+![The SWR alarm firing](docs/linux-alarm.png)
+
+The Display tab. Peak reset acts on the meter picked here, which is the same selection the Meters and
+W2 Controls tabs use, so it can't disagree with them. "Reset all peaks" appears once a second meter
+is configured, because with a single window the peak reported is the highest across every connected
+meter:
+
+![The Display tab](docs/linux-display.png)
+
 ## Install
 
 1. Download the build for your platform from the

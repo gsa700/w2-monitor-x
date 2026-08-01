@@ -4,6 +4,16 @@ Dogfooding feedback and small improvements, batched into releases.
 
 ## Open
 
+- **"Always on top" does nothing on Wayland (Pi / labwc)** *(found 2026-07-31)* — the Display
+  checkbox sets `Window.Topmost`, which wlroots-based compositors don't honour: there is no Wayland
+  protocol for a client to ask to be always-on-top, and labwc ignores the request. Verified on the
+  CM5 rather than assumed — a focus window positioned deliberately underneath another application,
+  with `AlwaysOnTop: true` in config and the window confirmed mapped via its taskbar entry, still
+  drew behind it. A user can tick the box and nothing happens, with nothing saying why. Confirm it
+  does still work on Windows before describing it as platform-specific, then either hide the option
+  where the compositor ignores it or mark it unsupported in the UI. (`App.axaml.cs` sets `Topmost` in
+  `CreateFocusWindow` / `CreateMeterWindow`.)
+
 - **Reset peak needs a meter selector of its own** *(dogfooding, 2026-07-31)* — "Reset peak forward"
   in Setup acts on whichever meter is selected in the meter list, which is the correct target but an
   invisible one: nothing beside the button says which meter it will reset, and with per-meter windows
