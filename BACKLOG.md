@@ -4,43 +4,6 @@ Dogfooding feedback and small improvements, batched into releases.
 
 ## Open
 
-- **The installer should own a desktop shortcut, on both platforms** *(dogfooding, 2026-07-31)* —
-  `Register` writes a menu entry, an icon and (Linux) the `~/.local/bin` symlink, but nothing on the
-  desktop, which on a Pi is how a GUI app actually gets launched. The Linux desktop shortcut on the
-  CM5 came from `install-desktop-shortcut.sh`, which shipped in the pre-installer zips and no longer
-  exists, so it is unmanaged: it doesn't follow an update, and `--uninstall` leaves it behind.
-
-  *What motivated this:* that stale shortcut still pointed into `~/Downloads/W2Monitor-linux-arm64/`
-  after the folder was deleted. With a dead `Exec` and a missing `Icon`, PCManFM stops treating the
-  file as a launcher and falls back to its "this is an executable program — Execute / Execute in
-  Terminal / Cancel" prompt, so every launch needed a confirmation click and the cause was
-  invisible. A shortcut the installer maintains would have been repointed on the next launch.
-
-  **Windows is the easy half.** `CreateShortcut(lnkPath, target, workingDirectory, description)`
-  already exists (WScript.Shell by reflection) and already writes the Start Menu `.lnk`. A desktop
-  one is the same call against
-  `Environment.GetFolderPath(SpecialFolder.DesktopDirectory)` + `DisplayName + ".lnk"`, plus a
-  `TryDelete` beside the Start Menu entry in `Unregister`.
-
-  **Linux needs more care:**
-  - `DesktopEntry.Build` already produces the file content; the new part is *where* and the mode.
-  - **The exec bit is required**, not cosmetic — a `.desktop` on the desktop without it is treated as
-    untrusted. `MakeExecutable` already exists.
-  - **Don't assume `~/Desktop`.** The location is `XDG_DESKTOP_DIR` from `~/.config/user-dirs.dirs`
-    and is localised on non-English systems. Check what .NET's `SpecialFolder.DesktopDirectory`
-    actually returns on Linux before relying on it — the `File.ResolveLinkTarget` bug in v0.7.0-beta
-    came from exactly this kind of assumption about a BCL call.
-  - Uninstall removes it **as a single file**; the desktop directory is shared and must never be
-    deleted, same rule as `~/.local/bin` and the icon theme.
-  - **Adopt the legacy name.** Real machines have `w2monitor.desktop` (no hyphen) from the retired
-    script, next to the installer's `w2-monitor.desktop`. Left alone that's two identical-looking
-    icons, one of them dead — the same duplicate-launcher trap `LegacyFolders` exists to avoid for
-    install directories.
-
-  Open question: whether it's unconditional. `--install --quiet` has nowhere to ask, so either create
-  it by default and remove it on uninstall, or add a `--no-desktop-shortcut` opt-out.
-  (`InstallService`, `DesktopEntry`.)
-
 - **"Always on top" does nothing on Wayland (Pi / labwc)** *(found 2026-07-31)* — the Display
   checkbox sets `Window.Topmost`, which wlroots-based compositors don't honour: there is no Wayland
   protocol for a client to ask to be always-on-top, and labwc ignores the request. Verified on the
@@ -119,20 +82,25 @@ Dogfooding feedback and small improvements, batched into releases.
   first miss — 0.6.1's helper had no `-WorkingDirectory` and still failed. `Mode` cannot be the
   discriminator either, since it derives from paths that don't vary between launches.
 
-  **Don't spend more time on black-box forensics; instrument it.** The failure is silent three ways
-  over, so nothing distinguishes "skipped", "ran and reg.exe refused" and "threw before it got there".
-  Record the outcome of each registration attempt — result, timestamp, and the `reg import` exit code —
-  somewhere durable, and surface it on Setup → Updates. The next update then produces evidence instead
-  of another round of registry archaeology.
+  **Instrumented rather than theorised about further (unreleased).** Every attempt now appends a line
+  to `registration.log` beside `config.json` — timestamp, app version, trigger, result, and detail
+  specific enough to separate the failure modes: the `reg import` exit code, whether the retry ran,
+  whether the verify query disagreed with a write that claimed success. The skip and throw paths, which
+  previously produced nothing at all, are recorded too. The updater's helper appends `--updated` when
+  it relaunches, so the attempt is logged under the trigger that matters. Surfaced on Setup → Updates,
+  shown even when healthy, and it names an entry left on an older version rather than reporting a plain
+  success. (`RegistrationLog` in Core, 12 tests; `InstallService`, `App.axaml.cs`, `UpdateApplyScript`.)
+
+  **What to look for after the next two updates.** The `--updated` flag arrives one release late by
+  construction — the outgoing build writes the helper that starts the incoming one — so the *first*
+  update after this ships still relaunches without it and will log as `startup`. From the one after
+  that, the log answers the question directly: a line with trigger `update` and a failure detail means
+  the call ran and something refused it; **no line at all** for that launch means it never ran, which
+  points at the call site rather than at `reg.exe`.
 
   *Severity is low, so this can wait for a quiet moment:* only `DisplayVersion` and `EstimatedSize` go
   stale. `UninstallString` and `InstallLocation` are path-based and stay correct, so removing the app
   through Settings still works.
-
-  *Worth doing regardless of cause:* stop discarding the result. `EnsureRegistered` should surface a
-  failed registration somewhere a person or a later session can see — the Updates tab is the natural
-  place — so the next occurrence produces evidence instead of forensics. Re-asserting when an update
-  completes, rather than only at startup, would also cover the exact launch that missed here.
 
 - **An installed-apps entry was written and then vanished (v0.6.0-beta, 2026-07-30).** After David's
   clean install to `%LOCALAPPDATA%\Programs\W2 Monitor`, the program and the Start Menu shortcut were
@@ -186,6 +154,37 @@ entry, and the CM5 shakedown of the installer's Linux paths (`HANDOFF-PI.md` car
 for that one).
 
 ## Done
+
+- **The installer owns a desktop shortcut, on both platforms** (unreleased) — `Register` wrote a menu
+  entry, an icon and the Linux `~/.local/bin` symlink but nothing on the desktop, which on a Pi is how
+  a GUI app actually gets launched. The CM5's shortcut came from the retired
+  `install-desktop-shortcut.sh`, so it was unmanaged: it didn't follow an update, `--uninstall` left it
+  behind, and once its `Exec` pointed into a deleted `~/Downloads` folder PCManFM stopped treating it
+  as a launcher and prompted for confirmation on every launch instead.
+
+  *The open question is settled: unconditional, but never destructive.* It is created whenever nothing
+  is already at its path, and an existing file there is left strictly alone — a user may have moved it,
+  retargeted it or made their own, and this runs at every launch, so overwriting would undo that
+  silently and repeatedly. No `--no-desktop-shortcut` switch: deleting the icon is the opt-out, and it
+  is not recreated while any file occupies the path.
+
+  *Legacy launchers are adopted rather than ignored* — `w2monitor.desktop` (no hyphen) from the old
+  script is removed and replaced by the installer's own, so the machine ends with one working icon
+  instead of one working and one dead. Same duplicate trap `InstallLayout.LegacyFolders` avoids for
+  install directories. Uninstall removes both, as named files: the desktop directory is the user's and
+  is never swept.
+
+  *`~/Desktop` is not assumed.* The location comes from `XDG_DESKTOP_DIR` in
+  `~/.config/user-dirs.dirs`, since the directory is localised and can be switched off; `$HOME/` there
+  means "no desktop" by convention and yields no shortcut rather than a file dropped at the top of
+  someone's home directory. .NET's `SpecialFolder.DesktopDirectory` is deliberately not trusted on
+  Linux — it answers `$HOME/Desktop` whether or not that is true — which is the same kind of
+  assumption that produced the v0.7.0-beta symlink bug. Falls back to `~/Desktop` only when it already
+  exists. (`XdgUserDirs` in Core, 13 tests; `InstallService`.)
+
+  **Known limitation:** a shortcut sitting at the canonical path is never repointed, only left alone,
+  so one that has gone stale there is not repaired — the file cannot be told apart from a user's own.
+  The legacy-name case is handled; this one would need a marker to identify the installer's own file.
 
 - **SensorLock holds the sampler lock through a sub-threshold dip** (v0.5.1-beta; **confirmed on air
   2026-07-31**) — closes the last of the 2026-07-17 bug hunt. `Accept` used to drop the lock on the

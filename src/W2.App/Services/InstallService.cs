@@ -118,6 +118,62 @@ public static class InstallService
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "Microsoft", "Windows", "Start Menu", "Programs", DisplayName + ".lnk");
 
+    /// <summary>
+    /// The user's desktop directory, or null if there isn't one. On Windows this is a known folder
+    /// and always exists. On Linux it comes from <c>XDG_DESKTOP_DIR</c> in
+    /// <c>~/.config/user-dirs.dirs</c>, because <c>~/Desktop</c> is an assumption: the directory is
+    /// localised, and a user can disable it entirely. Null means "don't put a shortcut anywhere".
+    /// </summary>
+    /// <remarks>
+    /// .NET's <see cref="Environment.SpecialFolder.DesktopDirectory"/> is deliberately not trusted on
+    /// Linux — it returns <c>$HOME/Desktop</c> whether or not that is where the desktop is, or whether
+    /// one exists at all. The v0.7.0-beta symlink bug came from taking a BCL call's Linux behaviour on
+    /// faith, so this reads the file the desktop environment actually uses.
+    /// </remarks>
+    private static string? DesktopDirectory
+    {
+        get
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                var d = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                return string.IsNullOrEmpty(d) ? null : d;
+            }
+
+            var conf = Path.Combine(HomeDirectory, ".config", "user-dirs.dirs");
+            var dir = XdgUserDirs.Resolve(TryReadAllText(conf), XdgUserDirs.DesktopKey, HomeDirectory);
+
+            // No user-dirs.dirs at all is the minimal-install case rather than a refusal, so fall back
+            // to ~/Desktop — but only if it is already there. Creating it would invent a desktop on a
+            // machine that hasn't got one.
+            if (dir is null)
+            {
+                var guess = Path.Combine(HomeDirectory, "Desktop");
+                return Directory.Exists(guess) ? guess : null;
+            }
+            return dir;
+        }
+    }
+
+    /// <summary>Desktop shortcut this installer owns.</summary>
+    private static string? DesktopShortcutPath => DesktopDirectory is { } d
+        ? Path.Combine(d, OperatingSystem.IsWindows() ? DisplayName + ".lnk" : DesktopEntry.FileName)
+        : null;
+
+    /// <summary>
+    /// Desktop launchers from the retired <c>install-desktop-shortcut.sh</c> that shipped in the
+    /// pre-installer zips. Adopted rather than ignored: left alone they sit beside the installer's own
+    /// launcher as a second, identical-looking icon pointing at a download folder that no longer
+    /// exists — the same duplicate trap <see cref="InstallLayout.LegacyFolders"/> avoids for install
+    /// directories.
+    /// </summary>
+    private static IEnumerable<string> LegacyDesktopShortcuts()
+    {
+        if (DesktopDirectory is not { } d) yield break;
+        if (OperatingSystem.IsWindows()) yield break;
+        yield return Path.Combine(d, "w2monitor.desktop");   // no hyphen: what the old script wrote
+    }
+
     /// <summary>How this copy is running. Derived from its path every time — never cached or stored.</summary>
     public static InstallMode Mode => InstallLayout.Detect(
         ExeDirectory,
@@ -312,10 +368,65 @@ public static class InstallService
         catch (IOException ex) { steps.Add($"symlink failed: {ex.Message}"); }
         catch (UnauthorizedAccessException ex) { steps.Add($"symlink failed: {ex.Message}"); }
 
+        steps.Add(EnsureDesktopShortcut(exePath, Path.GetDirectoryName(exePath)!));
+
         var ok = File.Exists(DesktopFilePath);
         if (!ok) steps.Add("no .desktop entry on disk afterwards");
         detail = string.Join("; ", steps);
         return ok;
+    }
+
+    /// <summary>
+    /// Put a launcher on the desktop, unless something is already there. Returns a line for the
+    /// registration log.
+    /// </summary>
+    /// <remarks>
+    /// **Never overwrites.** An existing file at that path is the user's — they may have moved it,
+    /// renamed the target, pointed it at a different profile, or made it by hand — and replacing it on
+    /// every launch would undo that silently and repeatedly, since this runs at every start. The only
+    /// file it will replace is a legacy launcher from the retired shell script, which is adopted
+    /// precisely so it stops being a second dead icon beside the real one.
+    ///
+    /// A desktop <c>.desktop</c> file must be executable or the desktop treats it as untrusted and
+    /// offers to run it as a program instead of launching it — the confirmation prompt that made the
+    /// stale CM5 shortcut so puzzling. Nothing here is worth failing an install over.
+    /// </remarks>
+    private static string EnsureDesktopShortcut(string exePath, string workingDirectory)
+    {
+        if (DesktopShortcutPath is not { } shortcut) return "no desktop directory";
+
+        try
+        {
+            // Adopt first: a legacy launcher is replaced by ours at the canonical name, so the user
+            // ends up with one working icon rather than one working and one dead.
+            var adopted = false;
+            foreach (var legacy in LegacyDesktopShortcuts())
+            {
+                if (!File.Exists(legacy) || InstallLayout.SamePath(legacy, shortcut)) continue;
+                TryDelete(legacy);
+                adopted = true;
+            }
+
+            if (File.Exists(shortcut))
+                return adopted ? "desktop shortcut kept, legacy one removed" : "desktop shortcut already there";
+
+            if (OperatingSystem.IsWindows())
+            {
+                CreateShortcut(shortcut, exePath, workingDirectory, Description);
+            }
+            else
+            {
+                var icon = File.Exists(IconFilePath) ? IconFilePath : null;
+                File.WriteAllText(shortcut, DesktopEntry.Build(DisplayName, exePath, icon, Description));
+                MakeExecutable(shortcut);
+            }
+
+            return File.Exists(shortcut)
+                ? adopted ? "desktop shortcut created, legacy one removed" : "desktop shortcut created"
+                : "desktop shortcut could not be created";
+        }
+        catch (IOException ex) { return $"desktop shortcut failed: {ex.Message}"; }
+        catch (UnauthorizedAccessException ex) { return $"desktop shortcut failed: {ex.Message}"; }
     }
 
     private static string? TryReadAllText(string path)
@@ -369,6 +480,7 @@ public static class InstallService
         }
 
         CreateShortcut(StartMenuShortcut, exePath, dir, Description);
+        EnsureDesktopShortcut(exePath, dir);
 
         detail = $"reg import exit {importExit}{(retried ? ", after retry" : "")}" +
                  (verified ? "" : wrote ? ", but the verify query found no entry" : "");
@@ -566,6 +678,12 @@ public static class InstallService
 
     private static void Unregister()
     {
+        // The desktop directory is the user's, shared with everything else they keep there — so this
+        // is a named file, never a sweep. Legacy launchers go too: leaving one behind after an
+        // uninstall means a dead icon pointing at a program that isn't there any more.
+        if (DesktopShortcutPath is { } shortcut) TryDelete(shortcut);
+        foreach (var legacy in LegacyDesktopShortcuts()) TryDelete(legacy);
+
         if (OperatingSystem.IsWindows())
         {
             Run(RegExe, ["delete", UninstallKey, "/f"]);
