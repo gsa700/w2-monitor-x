@@ -5,6 +5,16 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+### Fixed
+- **The `~/.local/bin/w2-monitor` symlink is created on Linux.** It never was — not on first install,
+  not on any later launch. The installer probed for an existing link with `File.ResolveLinkTarget`
+  before deciding whether to create one, and that call throws `FileNotFoundException` when nothing is
+  at the path at all, which is precisely the first-install case. Since that derives from
+  `IOException`, the throw landed in the handler meant for a failed *creation* and the create was
+  skipped every time. Found on the CM5, where the `.desktop` entry and the hicolor icon were both in
+  place and the symlink was not. Probing now lives in `W2.Core.Symlink`, where a missing path is an
+  answer rather than an exception, so the `catch` in `InstallService` guards only the creation.
+
 ## [0.6.2-beta] - 2026-07-31
 
 One fix, in the updater itself. Worth taking even though the failure is narrow, because it is the

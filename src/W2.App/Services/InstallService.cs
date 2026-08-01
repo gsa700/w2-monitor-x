@@ -226,16 +226,12 @@ public static class InstallService
 
         try
         {
-            // Replace the link only if it's missing or aimed somewhere else — an install directory
-            // that moved, say. Deleting and recreating an already-correct link every launch would be
-            // a pointless window in which the terminal command doesn't exist.
-            var target = File.ResolveLinkTarget(SymlinkPath, returnFinalTarget: false)?.FullName;
-            if (!InstallLayout.SamePath(target, exePath))
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(SymlinkPath)!);
-                if (File.Exists(SymlinkPath) || Directory.Exists(SymlinkPath)) File.Delete(SymlinkPath);
-                File.CreateSymbolicLink(SymlinkPath, exePath);
-            }
+            // Replaces the link only if it's missing or aimed somewhere else — an install directory
+            // that moved, say. Note this catch guards only the *creation*: probing for an absent link
+            // used to throw FileNotFoundException from in here, which — being an IOException — landed
+            // in the handler below and skipped the create, so on Linux the symlink was never made on
+            // any launch. Symlink.ResolveTarget answers "no link" with null for that reason.
+            Symlink.Ensure(SymlinkPath, exePath);
         }
         catch (IOException) { /* the menu entry is the point; the symlink is a convenience */ }
         catch (UnauthorizedAccessException) { }
@@ -491,9 +487,11 @@ public static class InstallService
     {
         try
         {
-            // File.Exists follows symlinks, so a link whose target is already gone reports false;
-            // ask the link itself whether it is there.
-            if (File.Exists(path) || File.ResolveLinkTarget(path, returnFinalTarget: false) is not null)
+            // Ask the link itself as well as File.Exists: whether File.Exists follows a dangling
+            // symlink varies by runtime (measured true on .NET 10 / linux-arm64, false on the
+            // runtime this was first written against), so neither question alone reliably finds a
+            // link whose target is already gone.
+            if (File.Exists(path) || Symlink.ResolveTarget(path) is not null)
                 File.Delete(path);
         }
         catch (IOException) { /* a locked or vanished file is not worth failing an uninstall over */ }
