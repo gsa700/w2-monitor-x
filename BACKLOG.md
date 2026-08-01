@@ -85,28 +85,6 @@ Dogfooding feedback and small improvements, batched into releases.
   ordinary pure state-machine logic over a reading stream and would port cleanly. A peak-targeting
   bug has already shipped once (v0.4.1-beta's Reset Peak fix). (`MeterService` → `W2.Core`.)
 
-- **Confirm the SensorLock dip-release on a gapped signal** *(from the 2026-07-17 bug hunt)* — partly verified; the remaining half needs
-  SSB or CW, not a carrier.
-
-  *Confirmed on air 2026-07-29* (W2 #1, Search mode): carrier on S2 locked the display to S2; keying S1
-  while S2 was still live did **not** move it; unkeying S2 handed over to S1 promptly, and alternating
-  between them switched fast. So the switch paths (`clearlyStronger` / `lockedWentQuiet`) are prompt and
-  the fix's bias toward holding the lock introduced no sluggishness — that was its main regression risk,
-  and it's clear.
-
-  *Still outstanding:* that test used a **carrier**, which never crosses the 0.5 W transmit floor, so it
-  drove only paths this fix left untouched and would have passed identically before it. The dip case
-  needs gaps in the signal — roughly 20 s of slowly-counted SSB (or moderate CW) on one sampler while
-  the other is cabled and picking up stray. The `S1`/`S2` label in the status line should hold for the
-  whole over; pre-fix it flicked to the idle sampler in the gaps, taking the power and SWR readings with
-  it. Then hold PTT through 2+ s of dead air: past about a second the lock releases by design, and a
-  stray capturing the display at that point means `quietAfterFrames: 4` is too tight — raise it (6–8) in
-  the constructor default.
-
-  *Caveat:* if the idle sampler shows no stray pickup at all while you transmit, this meter cannot
-  exhibit the original bug, and the honest result is "not reproducible here" rather than "fixed."
-  (`SensorLock`.)
-
 - **Registration is skipped on the launch the updater performs (v0.6.2-beta, 2026-07-31).** After
   updating 0.6.1 → 0.6.2 in place, the app was running 0.6.2 while the installed-apps entry still read
   `DisplayVersion 0.6.1-beta`. The key's last-write time was 2026-07-30 17:55:52 — the *previous*
@@ -208,6 +186,20 @@ entry, and the CM5 shakedown of the installer's Linux paths (`HANDOFF-PI.md` car
 for that one).
 
 ## Done
+
+- **SensorLock holds the sampler lock through a sub-threshold dip** (v0.5.1-beta; **confirmed on air
+  2026-07-31**) — closes the last of the 2026-07-17 bug hunt. `Accept` used to drop the lock on the
+  first frame at or below the 0.5 W transmit floor, but SSB and CW both fall below it *within* an over,
+  so the lock released mid-over and a stray above the floor on the other sampler could capture the
+  display. Release now needs four consecutive sub-threshold frames on the locked sampler, and any keyed
+  frame resets the run.
+
+  Verification came in two passes, and the first one is the cautionary half: a **carrier** test on
+  2026-07-29 exercised only `clearlyStronger` / `lockedWentQuiet`, both untouched by the fix, and would
+  have passed identically before it — useful as a regression check that the hold-on bias didn't make
+  antenna swaps sluggish, useless as proof of the fix. The gapped-signal test on 2026-07-31 is what
+  actually settled it. `quietAfterFrames: 4` (~0.8–1 s at the observed 4–5 frames/s) needs no change.
+  (`SensorLock`, +4 tests.)
 
 - **Reset peak got the meter picker the rest of Setup already used** (v0.7.0-beta) — the button acts
   on the meter selected in Setup, correct since v0.4.1-beta, but it sits on the **Display** tab while
