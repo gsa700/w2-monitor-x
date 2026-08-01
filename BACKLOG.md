@@ -124,13 +124,32 @@ Dogfooding feedback and small improvements, batched into releases.
   `catch { /* never block startup over this */ }`. There is no path by which a user or a later session
   learns it didn't happen.
 
-  *Unresolved, and possibly the same fault as the entry that vanished below.* The 0.6.0 → 0.6.1 update
-  relaunch **did** write the key (17:55:52, one second after that launch), so it is not simply "update
-  relaunches never register" — it worked once and not the next time. Two candidates worth testing
-  before assuming a cause: whether the relaunch resolves the exe through a path that makes
-  `InstallLayout.Detect` return `Loose` (an 8.3 short path would defeat `SamePath`, which is
-  case-insensitive but not length-normalising), and whether something transient right after the exe is
-  replaced makes the `reg import` spawn fail.
+  *Now three consecutive misses, and black-box observation has run out.* Tracked across four updates
+  on the same machine:
+
+  | update | relaunch registered? |
+  |---|---|
+  | 0.6.0 → 0.6.1 | **yes** — key written 17:55:52, one second after that launch |
+  | 0.6.1 → 0.6.2 | no |
+  | 0.6.2 → 0.7.0 | no |
+  | 0.7.0 → 0.7.1 | no |
+
+  Everything that would explain it mechanically has been checked and doesn't: a manual launch of the
+  same installed binary registers correctly and promptly (verified twice), the helper's relaunch is a
+  plain `Start-Process -FilePath <exe> -WorkingDirectory <installdir>` with no redirection or altered
+  token, and the one release that changed that line (0.6.2's working-directory fix) sits *after* the
+  first miss — 0.6.1's helper had no `-WorkingDirectory` and still failed. `Mode` cannot be the
+  discriminator either, since it derives from paths that don't vary between launches.
+
+  **Don't spend more time on black-box forensics; instrument it.** The failure is silent three ways
+  over, so nothing distinguishes "skipped", "ran and reg.exe refused" and "threw before it got there".
+  Record the outcome of each registration attempt — result, timestamp, and the `reg import` exit code —
+  somewhere durable, and surface it on Setup → Updates. The next update then produces evidence instead
+  of another round of registry archaeology.
+
+  *Severity is low, so this can wait for a quiet moment:* only `DisplayVersion` and `EstimatedSize` go
+  stale. `UninstallString` and `InstallLocation` are path-based and stay correct, so removing the app
+  through Settings still works.
 
   *Worth doing regardless of cause:* stop discarding the result. `EnsureRegistered` should surface a
   failed registration somewhere a person or a later session can see — the Updates tab is the natural
