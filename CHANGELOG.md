@@ -5,6 +5,12 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+## [0.7.1-beta] - 2026-07-31
+
+A Setup tidy-up on top of v0.7.0-beta, from dogfooding it on the CM5 the same evening. One change,
+and partly cleaning up after the last release: v0.7.0-beta's peak-reset controls landed between the
+TX timer's checkbox and the timeout that governs it, which made an existing disconnect worse.
+
 ### Changed
 - **Setup → Display now groups each readout with the settings that govern it.** The TX timer's
   show/hide checkbox sat in the toggle grid while the timeout it sets sat at the foot of the tab,
