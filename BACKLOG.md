@@ -4,6 +4,30 @@ Dogfooding feedback and small improvements, batched into releases.
 
 ## Open
 
+- **Reset peak needs a meter selector of its own** *(dogfooding, 2026-07-31)* — "Reset peak forward"
+  in Setup acts on whichever meter is selected in the meter list, which is the correct target but an
+  invisible one: nothing beside the button says which meter it will reset, and with per-meter windows
+  open the natural mental model is "reset the meter whose window I'm looking at." Give the button its
+  own selector (or label it with the selected meter's name), and consider a "reset both". Note the
+  targeting itself is already right — that was fixed in v0.4.1-beta — so this is purely about making
+  the target visible. (`SetupViewModel`, `SetupWindow.axaml`.)
+
+- **"PEAK FORWARD" doesn't say it is a session high-water mark** *(dogfooding, 2026-07-31)* — it binds
+  `SessionPeakW`, a maximum since app start that only ever rises and is cleared solely by Reset Peak.
+  So a single high over latches the number, and every later lower-power transmission leaves it
+  unchanged. On the CM5 this read an identical `11.2 W` on both meters long after the event that set
+  it, which looked exactly like cross-talk between the two meters and prompted an investigation before
+  release. *Ruled out on air 2026-07-31:* after resetting both and keying W2 #1 alone, #1 read
+  `4.6 W` and #2 stayed `0.0 W` — peak is genuinely per-meter and correct. The number was right and
+  the label was misleading. Consider naming it "peak (session)", showing the per-over peak
+  (`OverPeakW`, already tracked) alongside it, or timestamping the held value. (`MainWindowViewModel`.)
+
+- **Peak, peak-hold and TX-timer logic live in the App layer, untested** — `MeterService` holds
+  `SessionPeakW`, the 1.5 s peak-hold ease-down, `OverPeakW` and the TX timer, none of which any of
+  the 196 tests touch, contrary to the design rule that non-UI logic belongs in `W2.Core`. It is
+  ordinary pure state-machine logic over a reading stream and would port cleanly. A peak-targeting
+  bug has already shipped once (v0.4.1-beta's Reset Peak fix). (`MeterService` → `W2.Core`.)
+
 - **Confirm the SensorLock dip-release on a gapped signal** *(from the 2026-07-17 bug hunt)* — partly verified; the remaining half needs
   SSB or CW, not a carrier.
 
