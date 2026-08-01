@@ -9,9 +9,20 @@ Dogfooding feedback and small improvements, batched into releases.
   protocol for a client to ask to be always-on-top, and labwc ignores the request. Verified on the
   CM5 rather than assumed — a focus window positioned deliberately underneath another application,
   with `AlwaysOnTop: true` in config and the window confirmed mapped via its taskbar entry, still
-  drew behind it. A user can tick the box and nothing happens, with nothing saying why. Confirm it
-  does still work on Windows before describing it as platform-specific, then either hide the option
-  where the compositor ignores it or mark it unsupported in the UI. (`App.axaml.cs` sets `Topmost` in
+  drew behind it. A user can tick the box and nothing happens, with nothing saying why.
+
+  *Confirmed working on Windows 11 Pro (v0.7.0-beta, 2026-07-31)*, so this is genuinely
+  platform-specific and not a regression in the setting itself — which means the fix is about saying
+  so, not about repairing `Topmost`.
+
+  What to settle before implementing: **which condition to test for.** "Wayland" is the wrong
+  question — no Wayland compositor offers a client-requestable always-on-top, but an X11 client gets
+  `_NET_WM_STATE_ABOVE`, and this app may be running as an X11 client under XWayland rather than as a
+  native Wayland one (`.xsession-errors` on the CM5 is full of `xwayland/xwm.c` traffic). So the
+  honest test is probably "did the request take effect", not "what is the session type" — and
+  labwc's own xwm may or may not honour the hint. Worth checking what Avalonia actually reports for
+  the backend before hiding a control on the strength of `$WAYLAND_DISPLAY`. Once known: hide the
+  option where it cannot work, or leave it visible and annotated. (`App.axaml.cs` sets `Topmost` in
   `CreateFocusWindow` / `CreateMeterWindow`.)
 
 - **"PEAK FORWARD" doesn't say it is a session high-water mark** *(dogfooding, 2026-07-31)* — it binds
