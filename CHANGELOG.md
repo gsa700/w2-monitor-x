@@ -5,6 +5,15 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+### Changed
+- **Setup → Display now groups each readout with the settings that govern it.** The TX timer's
+  show/hide checkbox sat in the toggle grid while the timeout it sets sat at the foot of the tab,
+  with nothing connecting the two — and the peak-reset controls landing between them in v0.7.0-beta
+  widened the gap. The tab is now a plain toggle grid, then a **TX TIMER** section holding its
+  checkbox, its timeout and a note on what the readout does at the limit, then a **PEAK FORWARD**
+  section holding its checkbox and the reset picker and buttons. Section headers follow the
+  `SELECTED METER — PORT` style already used on the Meters tab.
+
 ## [0.7.0-beta] - 2026-07-31
 
 Shaken down on a Raspberry Pi CM5 with two W2s connected. The headline is that the Linux install

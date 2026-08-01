@@ -186,23 +186,41 @@
       <ScrollViewer>
         <StackPanel Margin="8" Spacing="12">
 
-          <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto">
+          <!-- Plain show/hide toggles. The two readouts that have settings of their own — the TX
+               timer and peak forward — are pulled out below, each sitting with what it governs.
+               Leaving them here put the TX timer's checkbox in this grid and its timeout at the
+               foot of the tab, with nothing saying the one set the other's limit. -->
+          <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto">
             <CheckBox Grid.Row="0" Grid.Column="0" Content="Status line" IsChecked="{Binding Display.ShowStatusLine, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
             <CheckBox Grid.Row="0" Grid.Column="1" Content="Power bar" IsChecked="{Binding Display.ShowPowerBar, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
             <CheckBox Grid.Row="1" Grid.Column="0" Content="SWR bar" IsChecked="{Binding Display.ShowSwrBar, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
             <CheckBox Grid.Row="1" Grid.Column="1" Content="Reflected power" IsChecked="{Binding Display.ShowReflected, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
             <CheckBox Grid.Row="2" Grid.Column="0" Content="Return loss" IsChecked="{Binding Display.ShowReturnLoss, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
-            <CheckBox Grid.Row="2" Grid.Column="1" Content="Peak forward" IsChecked="{Binding Display.ShowPeak, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
-            <CheckBox Grid.Row="3" Grid.Column="0" Content="TX timer" IsChecked="{Binding Display.ShowTx, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
-            <CheckBox Grid.Row="3" Grid.Column="1" Content="Always on top" IsChecked="{Binding Display.AlwaysOnTop, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+            <CheckBox Grid.Row="2" Grid.Column="1" Content="Always on top" IsChecked="{Binding Display.AlwaysOnTop, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
           </Grid>
 
-          <!-- Same picker, same SelectedRow, as the W2 Controls and SWR Alarm tabs. It sits down here
-               with the buttons rather than at the head of the tab because only these two are
-               per-meter — the checkboxes above and the timeout below are global display settings, and
-               a picker at the top would wrongly imply they were per-meter too. -->
+          <TextBlock Text="TX TIMER" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}" Margin="0,4,0,0"/>
+
+          <CheckBox Content="Show TX timer" IsChecked="{Binding Display.ShowTx, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+
+          <Grid ColumnDefinitions="Auto,Auto,*">
+            <TextBlock Grid.Column="0" Text="Timeout (s)" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <NumericUpDown Grid.Column="1" Minimum="30" Maximum="1800" Increment="10" Width="130"
+                           Value="{Binding Display.TimeoutSec, Mode=TwoWay}"/>
+          </Grid>
+
+          <TextBlock Text="The timer runs amber for the last 30 s, then flashes red once the timeout is passed. It only changes the readout — nothing is sent to the radio."
+                     Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
+
+          <TextBlock Text="PEAK FORWARD" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}" Margin="0,4,0,0"/>
+
+          <CheckBox Content="Show peak forward" IsChecked="{Binding Display.ShowPeak, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
+
+          <!-- Same picker, same SelectedRow, as the W2 Controls and SWR Alarm tabs, so the choice
+               can't drift. It sits here rather than at the head of the tab because only the reset is
+               per-meter; everything above is a global display setting. -->
           <StackPanel Spacing="8">
-            <TextBlock Text="Peak reset acts on the meter selected below."
+            <TextBlock Text="Reset acts on the meter selected below."
                        Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
 
             <ListBox Classes="picker" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
@@ -214,12 +232,6 @@
                       IsVisible="{Binding MultipleMeters}"/>
             </StackPanel>
           </StackPanel>
-
-          <Grid ColumnDefinitions="Auto,Auto,*">
-            <TextBlock Grid.Column="0" Text="TX timeout (s)" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-            <NumericUpDown Grid.Column="1" Minimum="30" Maximum="1800" Increment="10" Width="130"
-                           Value="{Binding Display.TimeoutSec, Mode=TwoWay}"/>
-          </Grid>
 
         </StackPanel>
       </ScrollViewer>
