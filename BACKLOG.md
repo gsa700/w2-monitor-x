@@ -14,14 +14,6 @@ Dogfooding feedback and small improvements, batched into releases.
   where the compositor ignores it or mark it unsupported in the UI. (`App.axaml.cs` sets `Topmost` in
   `CreateFocusWindow` / `CreateMeterWindow`.)
 
-- **Reset peak needs a meter selector of its own** *(dogfooding, 2026-07-31)* — "Reset peak forward"
-  in Setup acts on whichever meter is selected in the meter list, which is the correct target but an
-  invisible one: nothing beside the button says which meter it will reset, and with per-meter windows
-  open the natural mental model is "reset the meter whose window I'm looking at." Give the button its
-  own selector (or label it with the selected meter's name), and consider a "reset both". Note the
-  targeting itself is already right — that was fixed in v0.4.1-beta — so this is purely about making
-  the target visible. (`SetupViewModel`, `SetupWindow.axaml`.)
-
 - **"PEAK FORWARD" doesn't say it is a session high-water mark** *(dogfooding, 2026-07-31)* — it binds
   `SessionPeakW`, a maximum since app start that only ever rises and is cleared solely by Reset Peak.
   So a single high over latches the number, and every later lower-power transmission leaves it
@@ -31,6 +23,13 @@ Dogfooding feedback and small improvements, batched into releases.
   `4.6 W` and #2 stayed `0.0 W` — peak is genuinely per-meter and correct. The number was right and
   the label was misleading. Consider naming it "peak (session)", showing the per-over peak
   (`OverPeakW`, already tracked) alongside it, or timestamping the held value. (`MainWindowViewModel`.)
+
+  *Shaken down again on v0.7.0-beta, 2026-07-31:* with both meters keyed at deliberately different
+  powers, the peaks read `41.6 W` (#1, auto-ranged to 200 W) and `11.2 W` (#2, 20 W) — different
+  meters, different peaks, which is the case that started this. The combined figure the single focus
+  window reports was exercised on real meters in the same session and held the higher of the two, so
+  that path is no longer hardware-unverified. **The labelling problem above is still open** — none of
+  this changes what "PEAK FORWARD" tells you about which span it covers.
 
 - **Peak, peak-hold and TX-timer logic live in the App layer, untested** — `MeterService` holds
   `SessionPeakW`, the 1.5 s peak-hold ease-down, `OverPeakW` and the TX timer, none of which any of
@@ -142,6 +141,19 @@ entry, and the CM5 shakedown of the installer's Linux paths (`HANDOFF-PI.md` car
 for that one).
 
 ## Done
+
+- **Reset peak got the meter picker the rest of Setup already used** (v0.7.0-beta) — the button acts
+  on the meter selected in Setup, correct since v0.4.1-beta, but it sits on the **Display** tab while
+  that selection lives on the **Meters** tab, so nothing on screen named its target; with one window
+  open per meter the natural reading was "the meter I'm looking at." Display now carries the same
+  `ListBox.picker` bound to the same `SelectedRow` as the W2 Controls and SWR Alarm tabs, so the two
+  can't disagree and there's no new state to keep in step. Worth recording the false start: the first
+  attempt put the selected meter's *name* on the button instead, which meant a derived label property
+  and two `OnPropertyChanged` calls doing a job the existing picker does for free — reach for the
+  established control before inventing a second way to say the same thing. The picker sits beside the
+  buttons rather than at the head of the tab, because only the reset is per-meter; the display
+  toggles around it are global. Gained "Reset all peaks" alongside, which the combined focus-window
+  peak needs.
 
 - **Tabbed Setup, as on LP-100A** (v0.6.0-beta) — Meters / W2 Controls / SWR Alarm / Display / Updates,
   each in its own `ScrollViewer` so `MaxHeight` can't clip a control out of reach. The tab header names
