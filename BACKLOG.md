@@ -4,6 +4,43 @@ Dogfooding feedback and small improvements, batched into releases.
 
 ## Open
 
+- **The installer should own a desktop shortcut, on both platforms** *(dogfooding, 2026-07-31)* —
+  `Register` writes a menu entry, an icon and (Linux) the `~/.local/bin` symlink, but nothing on the
+  desktop, which on a Pi is how a GUI app actually gets launched. The Linux desktop shortcut on the
+  CM5 came from `install-desktop-shortcut.sh`, which shipped in the pre-installer zips and no longer
+  exists, so it is unmanaged: it doesn't follow an update, and `--uninstall` leaves it behind.
+
+  *What motivated this:* that stale shortcut still pointed into `~/Downloads/W2Monitor-linux-arm64/`
+  after the folder was deleted. With a dead `Exec` and a missing `Icon`, PCManFM stops treating the
+  file as a launcher and falls back to its "this is an executable program — Execute / Execute in
+  Terminal / Cancel" prompt, so every launch needed a confirmation click and the cause was
+  invisible. A shortcut the installer maintains would have been repointed on the next launch.
+
+  **Windows is the easy half.** `CreateShortcut(lnkPath, target, workingDirectory, description)`
+  already exists (WScript.Shell by reflection) and already writes the Start Menu `.lnk`. A desktop
+  one is the same call against
+  `Environment.GetFolderPath(SpecialFolder.DesktopDirectory)` + `DisplayName + ".lnk"`, plus a
+  `TryDelete` beside the Start Menu entry in `Unregister`.
+
+  **Linux needs more care:**
+  - `DesktopEntry.Build` already produces the file content; the new part is *where* and the mode.
+  - **The exec bit is required**, not cosmetic — a `.desktop` on the desktop without it is treated as
+    untrusted. `MakeExecutable` already exists.
+  - **Don't assume `~/Desktop`.** The location is `XDG_DESKTOP_DIR` from `~/.config/user-dirs.dirs`
+    and is localised on non-English systems. Check what .NET's `SpecialFolder.DesktopDirectory`
+    actually returns on Linux before relying on it — the `File.ResolveLinkTarget` bug in v0.7.0-beta
+    came from exactly this kind of assumption about a BCL call.
+  - Uninstall removes it **as a single file**; the desktop directory is shared and must never be
+    deleted, same rule as `~/.local/bin` and the icon theme.
+  - **Adopt the legacy name.** Real machines have `w2monitor.desktop` (no hyphen) from the retired
+    script, next to the installer's `w2-monitor.desktop`. Left alone that's two identical-looking
+    icons, one of them dead — the same duplicate-launcher trap `LegacyFolders` exists to avoid for
+    install directories.
+
+  Open question: whether it's unconditional. `--install --quiet` has nowhere to ask, so either create
+  it by default and remove it on uninstall, or add a `--no-desktop-shortcut` opt-out.
+  (`InstallService`, `DesktopEntry`.)
+
 - **"Always on top" does nothing on Wayland (Pi / labwc)** *(found 2026-07-31)* — the Display
   checkbox sets `Window.Topmost`, which wlroots-based compositors don't honour: there is no Wayland
   protocol for a client to ask to be always-on-top, and labwc ignores the request. Verified on the
