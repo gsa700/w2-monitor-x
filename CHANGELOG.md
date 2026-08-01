@@ -5,6 +5,44 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+## [0.8.0-beta] - 2026-07-31
+
+A desktop shortcut the installer actually maintains, and an end to guessing about why the Windows
+installed-apps entry sometimes goes stale. **The Linux half of the shortcut work has not run on real
+hardware** — the XDG desktop-directory lookup and the `.desktop` write are unit-tested and
+cross-published but untried on a Pi, which is the next thing to shake down on the CM5.
+
+### Added
+- **The installer puts a shortcut on your desktop.** Previously it wrote a menu entry, an icon and the
+  Linux `~/.local/bin` symlink but nothing on the desktop — which on a Raspberry Pi is how a GUI app
+  actually gets launched. The shortcut on the CM5 came from a script that shipped in the pre-installer
+  zips and no longer exists, so nothing maintained it: it didn't follow an update, uninstall left it
+  behind, and once it pointed at a deleted download folder the file manager stopped treating it as a
+  launcher and asked for confirmation on every launch instead.
+
+  It is created whenever nothing is already at its path, and **an existing shortcut is left strictly
+  alone** — you may have moved it, retargeted it or made your own, and this runs at every launch, so
+  overwriting would undo that silently and repeatedly. There is no opt-out switch because none is
+  needed: delete the icon and nothing puts it back. An old `w2monitor.desktop` from the retired script
+  is replaced by the installer's own, so you end up with one working icon rather than one working and
+  one dead, and uninstall removes both.
+
+  On Linux the location comes from `XDG_DESKTOP_DIR`, not a hardcoded `~/Desktop` — the folder is
+  localised, and a user can switch it off entirely, in which case no shortcut is created rather than a
+  file being dropped at the top of your home directory.
+- **Setup → Updates reports whether this copy is listed in the OS's installed-apps list**, for an
+  installed copy. Shown even when it is fine, because the fault it exists to catch is one where
+  nothing appears to be wrong, and it says so plainly when the entry was last written by an older
+  version than the one running.
+
+### Changed
+- **Registration now leaves a record of every attempt**, in `registration.log` beside `config.json`.
+  After an in-place update the installed-apps entry has sometimes kept the *previous* version, and
+  nothing on the machine distinguished "the call was skipped" from "Windows refused it" from "it threw
+  first" — diagnosing it meant reading a registry key's last-write timestamp and reasoning backwards.
+  Each attempt now records its trigger, result and enough detail to tell those apart. Nothing about
+  this changes what the app does; it changes what it can tell you afterwards.
+
 ## [0.7.1-beta] - 2026-07-31
 
 A Setup tidy-up on top of v0.7.0-beta, from dogfooding it on the CM5 the same evening. One change,
