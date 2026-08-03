@@ -91,12 +91,34 @@ Dogfooding feedback and small improvements, batched into releases.
   shown even when healthy, and it names an entry left on an older version rather than reporting a plain
   success. (`RegistrationLog` in Core, 12 tests; `InstallService`, `App.axaml.cs`, `UpdateApplyScript`.)
 
-  **What to look for after the next two updates.** The `--updated` flag arrives one release late by
-  construction — the outgoing build writes the helper that starts the incoming one — so the *first*
-  update after this ships still relaunches without it and will log as `startup`. From the one after
-  that, the log answers the question directly: a line with trigger `update` and a failure detail means
-  the call ran and something refused it; **no line at all** for that launch means it never ran, which
-  points at the call site rather than at `reg.exe`.
+  **The log answered it on the 0.8.0 → 0.9.0 update (2026-08-02), and killed both live theories.**
+
+  ```
+  01:50:15Z  0.9.0-beta  update   ok  reg import exit 0   <- the call DID run, as "update"
+  01:50:35Z  0.9.0-beta  startup  ok  reg import exit 0
+  01:55:29Z  0.9.0-beta  startup  ok  reg import exit 0   <- this one actually landed
+  ```
+
+  So it was never "the call is skipped" and never "reg.exe refuses". `reg.exe` returns 0 either way;
+  at 01:50 the key was untouched afterwards, and at 01:55 an identical call wrote it — the key's
+  last-write time matches that line to the second, with `EstimatedSize` moving to the 0.9.0 exe's.
+
+  *Ruled out by direct experiment, so don't re-run these.* No stray or misplaced key exists anywhere
+  in HKCU or HKLM. The same `RegFile` output, same UTF-16 BOM, same `reg.exe import` through
+  `ArgumentList` lands correctly when run from `dotnet`, from a **self-contained unsigned single-file
+  exe**, and from PowerShell — so the caller's identity, the file format, the BOM and the escaping are
+  all eliminated. Also worth knowing before it misleads someone: `reg import` writes *"The operation
+  completed successfully"* to **stderr**, so stderr text is not a failure signal.
+
+  *What is left is narrower and still unexplained:* `reg.exe` reports success without applying the
+  import, under a condition tied to something other than the code path — the only thing that changed
+  between the failing and succeeding attempts was that a probe had written the key in between. That is
+  a correlation with no mechanism behind it, and three hypotheses have already died here, so it is
+  recorded as an observation rather than a theory.
+
+  **Next instrument, whenever a release is being cut anyway:** log the `.reg` file's byte length and
+  `reg.exe`'s stderr next to the exit code. A failing attempt would then be distinguishable from a
+  working one by evidence rather than by re-deriving it from registry timestamps.
 
   *Severity is low, so this can wait for a quiet moment:* only `DisplayVersion` and `EstimatedSize` go
   stale. `UninstallString` and `InstallLocation` are path-based and stay correct, so removing the app
