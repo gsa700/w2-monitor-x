@@ -4,6 +4,21 @@ Dogfooding feedback and small improvements, batched into releases.
 
 ## Open
 
+- **Uninstall leaves the single-file extraction directory behind** *(found on the CM5, 2026-08-02)* —
+  a self-contained single-file build unpacks its native libraries to `$HOME/.net/<AppName>/<hash>/` on
+  Linux (`%TEMP%\.net\…` on Windows), and `Uninstall` knows nothing about it. The hash changes with
+  every build, so these accumulate one per distinct binary ever launched and are never reclaimed. On
+  this box: **176 MB**, across 7 `W2Monitor` directories and 10 `Lp100aMonitor` ones at 9.6–13 MB
+  each, the oldest dated 2026-07-04.
+
+  Not a correctness problem — the app runs fine and the directories are inert — but "uninstall the
+  program" leaving ~80 MB per app behind isn't what it says on the tin, and **LP-100A is affected
+  identically** since the installer pattern is shared. Two things to get right if it's implemented:
+  the path is chosen by the .NET host rather than by us, so removing `$HOME/.net/<AppName>` wholesale
+  is the honest scope; and a *running* copy has one of those directories open, which is why it belongs
+  in the uninstall trampoline beside the install directory rather than in `Unregister`.
+  (`InstallService`.)
+
 - **"Always on top" does nothing on Wayland (Pi / labwc)** *(found 2026-07-31)* — the Display
   checkbox sets `Window.Topmost`, which wlroots-based compositors don't honour: there is no Wayland
   protocol for a client to ask to be always-on-top, and labwc ignores the request. Verified on the
@@ -267,10 +282,28 @@ for that one).
   *Mostly settled on the CM5 since.* The filesystem work has now run on real hardware: install and
   uninstall round-trip against a sandboxed `HOME` (2026-07-31), the `~/.local/bin` symlink created on
   a real install once v0.7.0-beta fixed it, the desktop shortcut and its legacy adoption (2026-08-02),
-  and the crash log written by a genuinely failing `--install`. **Still outstanding: the `sh`
-  uninstall trampoline and the `chmod`**, which need `--uninstall` driven from an *installed*
-  published copy — a Debug build can't stand in, because copying the exe alone only suffices for a
-  self-contained single file.
+  and the crash log written by a genuinely failing `--install`.
+
+  *The `sh` trampoline and the `chmod` are settled too (2026-08-02).* A published `linux-arm64`
+  single-file build was installed to a sandboxed `HOME`/`XDG_*`/`TMPDIR` and then uninstalled **from
+  the installed copy**, which is the arrangement a Debug build can't provide. The generated script was
+  captured before it deleted itself:
+
+  ```sh
+  #!/bin/sh
+  while kill -0 38406 2>/dev/null; do sleep 0.3; done
+  rm -rf '<sandbox>/.local/share/w2-monitor'
+  rm -f '<sandbox>/tmp/w2monitor-uninstall.sh'
+  ```
+
+  Exactly one `rm -rf`, aimed at the install directory alone and shell-quoted — the property worth
+  proving, since a shared directory reaching that line is the unrecoverable case. Effects checked:
+  the install directory went, all four registration artifacts (menu entry, icon, `~/.local/bin`
+  symlink, desktop shortcut) were removed individually, `~/.local/bin`, `~/.local/share/applications`,
+  the icon theme and `~/Desktop` all survived, the script removed itself, and the quiet run kept
+  settings. `chmod` is exercised on the way in: both the installed executable and the `.desktop`
+  shortcut came out `rwxr-xr-x`. What it does *not* clean is the extraction directory — see the
+  separate item in Open.
 
 - **Avalonia 11.2.1 → 12.1.1, and the BCL packages the net10 retarget left behind** (v0.6.0-beta) — every
   prediction in the planned entry held, and the LP-100A notes were worth reading first:
