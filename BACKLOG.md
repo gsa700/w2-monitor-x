@@ -177,7 +177,7 @@ for that one).
 
 ## Done
 
-- **The installer owns a desktop shortcut, on both platforms** (unreleased) — `Register` wrote a menu
+- **The installer owns a desktop shortcut, on both platforms** (v0.8.0-beta) — `Register` wrote a menu
   entry, an icon and the Linux `~/.local/bin` symlink but nothing on the desktop, which on a Pi is how
   a GUI app actually gets launched. The CM5's shortcut came from the retired
   `install-desktop-shortcut.sh`, so it was unmanaged: it didn't follow an update, `--uninstall` left it
@@ -264,8 +264,13 @@ for that one).
   the release recipe's smoke-test step claimed a protection that never existed. Corrected in
   `HANDOFF-PI.md`; what actually protects a smoke test is force-killing it before save-on-exit.
 
-  Still open: the Linux half compiles, cross-publishes and is unit-tested, but none of its filesystem
-  work has run on real hardware. The CM5 is where that gets settled.
+  *Mostly settled on the CM5 since.* The filesystem work has now run on real hardware: install and
+  uninstall round-trip against a sandboxed `HOME` (2026-07-31), the `~/.local/bin` symlink created on
+  a real install once v0.7.0-beta fixed it, the desktop shortcut and its legacy adoption (2026-08-02),
+  and the crash log written by a genuinely failing `--install`. **Still outstanding: the `sh`
+  uninstall trampoline and the `chmod`**, which need `--uninstall` driven from an *installed*
+  published copy — a Debug build can't stand in, because copying the exe alone only suffices for a
+  self-contained single file.
 
 - **Avalonia 11.2.1 → 12.1.1, and the BCL packages the net10 retarget left behind** (v0.6.0-beta) — every
   prediction in the planned entry held, and the LP-100A notes were worth reading first:
@@ -285,8 +290,11 @@ for that one).
   three RIDs publish; the win-x64 single file launches; serial re-checked on both real W2s (connect,
   decode, connect-time probe); and in `--sim` every `PowerSwrBar` drawing path exercised and screenshotted
   — forward fill, cyan peak marker at the right offset, the SWR gradient (checked against `(swr-1)/2`),
-  and both phases of the alarm flash. Publish size +5%. Untested: linux-x64 and linux-arm64 are
-  cross-published only, so the CM5 still owes this a real launch before anything ships on it.
+  and both phases of the alarm flash. Publish size +5%. Untested at the time: linux-x64 and
+  linux-arm64 were cross-published only. *Since settled for arm64* — the CM5 has run published
+  single-file builds of v0.7.0/v0.7.1/v0.9.0-beta as its daily driver on two live W2s, and each
+  release's arm64 artifact is smoke-tested before upload. **linux-x64 is still cross-published only**
+  and has never been launched by anyone here.
 
 - **Setup list's status dots stuck on amber** (v0.6.0-beta) — raised as "make the connection lights green
   rather than orange"; it was a refresh bug, not a colour choice, and the colours are unchanged. Amber

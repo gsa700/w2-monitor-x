@@ -31,9 +31,15 @@ or protocol side.
 ## [0.8.0-beta] - 2026-07-31
 
 A desktop shortcut the installer actually maintains, and an end to guessing about why the Windows
-installed-apps entry sometimes goes stale. **The Linux half of the shortcut work has not run on real
-hardware** — the XDG desktop-directory lookup and the `.desktop` write are unit-tested and
-cross-published but untried on a Pi, which is the next thing to shake down on the CM5.
+installed-apps entry sometimes goes stale.
+
+> **Shipped with a caveat, since settled.** At release the Linux half had not run on real hardware —
+> the XDG desktop-directory lookup and the `.desktop` write were unit-tested and cross-published but
+> untried on a Pi. *Verified on the CM5, 2026-08-02, under v0.9.0-beta:* `XDG_DESKTOP_DIR` was read
+> rather than `~/Desktop` assumed, the shortcut was written with its executable bit and a target that
+> resolves, and the legacy `w2monitor.desktop` was adopted and removed on a machine that actually had
+> one — the adoption path met a real stale file rather than a synthetic one. `registration.log`
+> recorded it: `ok — entry already current; desktop shortcut created, legacy one removed`.
 
 ### Added
 - **The installer puts a shortcut on your desktop.** Previously it wrote a menu entry, an icon and the
