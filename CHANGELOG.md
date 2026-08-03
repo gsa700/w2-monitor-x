@@ -5,6 +5,12 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+## [0.9.0-beta] - 2026-08-02
+
+Groundwork for putting the app in front of testers: a crash now leaves something behind that can be
+sent, and the app says so rather than leaving the file to be discovered. Nothing changed on the serial
+or protocol side.
+
 ### Added
 - **A crash leaves a report behind.** Unhandled errors are now written to `crash.log` beside
   `config.json` — timestamp, app version, platform and the full stack including inner exceptions —
