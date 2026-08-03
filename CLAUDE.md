@@ -102,6 +102,20 @@ Each W2 is followed by its USB chip serial: FTDI serial pinning on **Windows** (
 - Cross-platform validated on real hardware: **Windows, Pi CM5 (linux-arm64), Fedora (linux-x64)**.
 - A Pi-side Claude session has worked this repo too (`HANDOFF-PI.md`); the two boxes sync via git
   (`main`, two-way pull/push). Keep `main` clean and rebased-friendly.
+- **Claude's saved memory does not cross machines — this repo is the only channel between sessions.**
+  Memory files live under the per-user Claude directory on whichever box a session ran on, so a
+  session on the Pi cannot read anything a session here saved, and vice versa. Nothing about the
+  project should live only in memory: put it in `CLAUDE.md`, `BACKLOG.md`, `CHANGELOG.md` or a commit
+  message. Memory is for how to work with David; the repo is for what is true about the project.
+
+  Two things follow, and both have already bitten:
+  - **Write the reasoning, not just the conclusion.** The next session is a stranger with no context —
+    it did not run the experiment, so "ruled out" saves it nothing unless the file says how. By the
+    same token a wrong claim here misinforms someone with no way to check it, which is why a stale
+    line in these files costs more than a bug in the code: the code has tests behind it.
+  - **Pull before editing the shared docs.** The two sessions are asynchronous with no liveness —
+    neither knows what the other is doing right now. On 2026-08-02 both edited `BACKLOG.md` within
+    minutes and it only merged cleanly because they happened to touch different sections.
 
 ## Self-install (Windows and Linux)
 
