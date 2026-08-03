@@ -29,6 +29,10 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // First thing, before the install switches and before Avalonia: a crash during startup on an
+        // unfamiliar machine is the one a tester is most likely to hit and least able to describe.
+        CrashLog.Install();
+
         var request = InstallCommandLine.Parse(args);
 
         // These run without a UI, so an exception here would surface as a crash dump rather than as
@@ -57,8 +61,12 @@ internal static class Program
                     break;
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            // These run without a UI, so the exit code is all a script sees and the user sees nothing
+            // at all. Record it: a failed --install is otherwise indistinguishable from one that
+            // worked, which is precisely the silence the crash log exists to break.
+            CrashLog.Write("install", ex);
             Environment.ExitCode = 1;
             return;
         }

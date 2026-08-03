@@ -5,6 +5,18 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+### Added
+- **A crash leaves a report behind.** Unhandled errors are now written to `crash.log` beside
+  `config.json` — timestamp, app version, platform and the full stack including inner exceptions —
+  and the README tells people where to find it and to attach it to an issue. Until now a crash left
+  nothing: on Linux the stack went to stderr, which for an app launched from the desktop menu goes
+  somewhere nobody will look, and on Windows it went nowhere at all, so the best report anyone could
+  give was "it closed." Handlers are attached before Avalonia starts, so a failure during startup —
+  the one a tester on an unfamiliar distribution is most likely to hit — is caught too, along with
+  faulted background tasks and a failed `--install`, which previously reported only an exit code.
+  The file keeps its last few reports; the tidy-up runs at startup rather than at crash time, since
+  a dying process should only append. (`CrashReport` in W2.Core, 16 tests; `CrashLog`.)
+
 ## [0.8.0-beta] - 2026-07-31
 
 A desktop shortcut the installer actually maintains, and an end to guessing about why the Windows

@@ -137,6 +137,21 @@ with your OS's own tools:
   symlink and removal — that haven't been run on a Linux box yet. Until they have, running it from
   where you unzipped it (or dropping a `portable.txt` beside it) is the conservative choice.
 
+## Reporting a problem
+
+Please open an [issue](https://github.com/gsa700/w2-monitor-x/issues) — and if the app closed
+unexpectedly, **attach `crash.log`**. It records unhandled errors with the version, platform and
+stack trace, and it's the difference between a fixable report and "it closed."
+
+| | |
+|---|---|
+| **Windows** | `%APPDATA%\W2Monitor\crash.log` — paste that into Explorer's address bar |
+| **Linux / Pi** | `~/.config/W2Monitor/crash.log` |
+
+The file holds only the last few reports, and it won't exist at all if the app has never crashed —
+which is the normal case. `config.json` sits in the same folder and is worth including too: it shows
+your meter setup and display options, minus anything personal.
+
 ## Build from source
 
 ```sh
