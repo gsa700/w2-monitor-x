@@ -258,6 +258,15 @@
                      IsVisible="{Binding ShowRegistrationStatus}"
                      FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
 
+          <!-- Only appears when a previous run actually crashed, so it is silent on a healthy machine.
+               Here rather than on the main window because it reports something already over: it needs
+               to be findable, not to interrupt. -->
+          <StackPanel IsVisible="{Binding ShowCrashNotice}" Spacing="6" Margin="0,4,0,0">
+            <TextBlock Text="{Binding CrashNotice}" Foreground="{StaticResource AmberBrush}"
+                       FontSize="11" TextWrapping="Wrap"/>
+            <Button Content="Show crash log" Command="{Binding ShowCrashLogCommand}" HorizontalAlignment="Left"/>
+          </StackPanel>
+
         </StackPanel>
       </ScrollViewer>
     </TabItem>

@@ -16,6 +16,11 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
   faulted background tasks and a failed `--install`, which previously reported only an exit code.
   The file keeps its last few reports; the tidy-up runs at startup rather than at crash time, since
   a dying process should only append. (`CrashReport` in W2.Core, 16 tests; `CrashLog`.)
+- **Setup → Updates says when a previous run crashed**, and offers **Show crash log** to reveal the
+  file ready to attach. Without it the log is only discoverable by rereading the README at exactly
+  the wrong moment. The notice appears only when there is something to report, so a machine that has
+  never crashed shows nothing, and it names the file rather than describing the fault — someone who
+  has to be told the log exists also has to be told what it is called.
 
 ## [0.8.0-beta] - 2026-07-31
 

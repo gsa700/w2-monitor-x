@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using Avalonia;
 using Avalonia.Media;
@@ -50,6 +51,7 @@ public sealed class SetupViewModel : ViewModelBase
 
         UpdateCommand = new RelayCommand(() => _ = UpdateButtonAsync(), () => !_updateBusy);
         OpenReleaseCommand = new RelayCommand(OpenRelease);
+        ShowCrashLogCommand = new RelayCommand(ShowCrashLog);
         UpdateStatus = $"You have {UpdateService.CurrentVersion}.";
 
         RefreshPorts();
@@ -108,6 +110,7 @@ public sealed class SetupViewModel : ViewModelBase
     public IBrush AlarmLockBrush => LampBrush(SelectedRow?.Meter?.AlarmLock == true);
     public RelayCommand UpdateCommand { get; }
     public RelayCommand OpenReleaseCommand { get; }
+    public RelayCommand ShowCrashLogCommand { get; }
 
     // W2 control lamp state (reflects the selected meter).
     public bool CanControl => SelectedRow?.Meter is { IsConnected: true };
@@ -312,6 +315,24 @@ public sealed class SetupViewModel : ViewModelBase
         : InstallService.LastAttempt is { } a && a.Version != UpdateService.CurrentVersion ? Palette.AmberBrush
         : Palette.DimBrush;
 
+    /// <summary>
+    /// When the newest recorded crash happened, read once at construction — which is startup, before
+    /// this session could add to it. So it answers "did a previous run end badly", and a crash in
+    /// *this* session surfaces on the next launch, by which time there is something to read.
+    /// </summary>
+    private readonly DateTime? _lastCrashUtc = CrashLog.LastCrashUtc();
+
+    public bool ShowCrashNotice => _lastCrashUtc is not null;
+
+    /// <summary>
+    /// Names the file rather than describing the fault: the point is to get it attached to a report,
+    /// and someone who has to be told the log exists also has to be told what it is called.
+    /// </summary>
+    public string CrashNotice => _lastCrashUtc is { } when
+        ? $"A crash was recorded on {when.ToLocalTime():d MMM} at {when.ToLocalTime():HH:mm}. " +
+          "Please attach crash.log to a bug report."
+        : "";
+
     private bool _updateAvailable;
     public bool UpdateAvailable
     {
@@ -384,6 +405,25 @@ public sealed class SetupViewModel : ViewModelBase
     {
         var url = _updateInfo?.ReleaseUrl ?? $"https://github.com/{UpdateService.Repo}/releases/latest";
         try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { /* ignore */ }
+    }
+
+    /// <summary>
+    /// Reveal <c>crash.log</c> in the file manager. Showing the file where it lives beats opening it
+    /// in a text editor, because the next step is attaching it to an email or an issue, and a
+    /// selected file can be dragged. Windows can select it outright; elsewhere the folder is as close
+    /// as <c>xdg-open</c> gets.
+    /// </summary>
+    private void ShowCrashLog()
+    {
+        try
+        {
+            var path = CrashLog.FilePath;
+            if (OperatingSystem.IsWindows() && File.Exists(path))
+                Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{path}\""));
+            else
+                Process.Start(new ProcessStartInfo(Path.GetDirectoryName(path)!) { UseShellExecute = true });
+        }
+        catch { /* a button that can't open a folder is not worth an error dialog */ }
     }
 }
 
