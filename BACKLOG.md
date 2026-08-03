@@ -11,6 +11,18 @@ Dogfooding feedback and small improvements, batched into releases.
   this box: **176 MB**, across 7 `W2Monitor` directories and 10 `Lp100aMonitor` ones at 9.6–13 MB
   each, the oldest dated 2026-07-04.
 
+  *Windows is bigger but self-limiting; Linux is smaller and permanent.* Measured on the Windows box
+  2026-08-02: **515 MB** in `%TEMP%\.net\`, of which `W2Monitor` is 209 MB over 12 directories and
+  `Lp100aMonitor` 263 MB over 15 — all since 2026-07-27, six days. The asymmetry is the part that
+  matters for prioritising: on Windows these sit in `%TEMP%`, which Storage Sense and Disk Cleanup can
+  reclaim, so the ceiling is bounded by whatever the OS eventually sweeps. On Linux they sit in
+  `$HOME/.net/`, which is not temporary and which nothing on the system ever cleans — so the Pi's
+  smaller 176 MB only ever grows. **Fix the Linux side first if the two are ever separated.**
+
+  Both counts are inflated by development — a release cycle publishes and smoke-tests several distinct
+  binaries in a day. A user updating through the in-app updater accrues one directory per version, at
+  roughly 17 MB, which is the number to reason about for the tester round.
+
   Not a correctness problem — the app runs fine and the directories are inert — but "uninstall the
   program" leaving ~80 MB per app behind isn't what it says on the tin, and **LP-100A is affected
   identically** since the installer pattern is shared. Two things to get right if it's implemented:
