@@ -5,6 +5,23 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+## [1.0.0-beta2] - 2026-09-04
+
+One fix, in the machinery that reports whether this copy is listed in Settings → Apps → Installed apps.
+
+### Fixed
+- **Registration is verified against what actually landed, not against the key merely existing.** The
+  check asked whether `DisplayName` was present — and it was, left over from an earlier release — so an
+  import that reported success and changed nothing still passed, and the diagnostic log recorded "ok"
+  for a write that never happened. It now reads `DisplayVersion` back and compares it to the running
+  version, and records what reg.exe itself printed rather than only its exit code. The intermittent
+  failure this exists to catch is not currently reproducible; what changed is that the next occurrence
+  will say so instead of claiming success. (`InstallService`.)
+- **Console tools are drained before being waited on.** Both output streams were redirected and never
+  read, which is the shape that deadlocks a parent when a child prints more than the pipe buffer holds.
+  reg.exe prints far too little for that to have bitten, which is exactly why it was worth fixing while
+  it was still cheap.
+
 ## [1.0.0-beta1] - 2026-09-04
 
 The first 1.0 candidate, and the first build meant for stations other than the one it was written on.

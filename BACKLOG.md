@@ -97,6 +97,41 @@ Dogfooding feedback and small improvements, batched into releases.
   ordinary pure state-machine logic over a reading stream and would port cleanly. A peak-targeting
   bug has already shipped once (v0.4.1-beta's Reset Peak fix). (`MeterService` → `W2.Core`.)
 
+- **The installed-apps entry sometimes doesn't get written, and until 2026-09-04 the app couldn't tell.**
+  *Detector fixed and shipped; the underlying fault is not currently reproducible.* Read this section
+  before spending time on it — three plausible explanations are already dead.
+
+  *What 2026-09-04 established.* The `--updated` instrumentation finally caught an update relaunch, and
+  the answer was neither of the two hypotheses recorded below. The log said
+  `1.0.0-beta1 update ok reg import exit 0` — so the call **runs** on the updater's relaunch, and
+  reg.exe **returns success** — while the registry key had not been touched since 2026-08-02. So the
+  failure is not "skipped" and not "reg.exe refused": the import reports success and nothing lands.
+
+  *Why every log line said `ok`.* `IsRegistered()` asked only whether `DisplayName` existed. It did,
+  left over from an earlier release, so an import that changed nothing still passed the check and
+  `Register` returned true. The instrument was asking the wrong question — presence, not freshness —
+  and had been reporting success for writes that never happened. **Fixed:** registration now reads
+  `DisplayVersion` back and compares it to the running version, and the log carries reg.exe's own
+  words alongside its exit code.
+
+  *Not reproducible after the fact.* Three attempts on 2026-09-04 (22:32, 22:52, 23:00) reported `ok`
+  without writing. A probe reproducing the app's exact file, path, encoding and command **landed**
+  minutes later, and the rebuilt app then registered correctly on a normal start. Nothing identified
+  distinguishes the failing attempts from the succeeding ones, and the failure has not recurred. Do
+  not assume the read-back fixed it — it fixed the *reporting*. If the next occurrence still says
+  `FAILED … entry now X, expected Y`, that is the detector working, not a regression.
+
+  *Also ruled out, from the earlier rounds:* a manual launch of the same installed binary registers
+  correctly (verified repeatedly); the helper's relaunch is a plain `Start-Process` with no redirection
+  or altered token; the release that changed that line sits *after* the first miss; `Mode` derives from
+  paths that don't vary between launches; and the `.reg` file the app writes imports cleanly when
+  replayed by hand.
+
+  *Severity stays low.* Only `DisplayVersion` and `EstimatedSize` go stale. `UninstallString` and
+  `InstallLocation` are path-based and stay correct, so removal through Settings keeps working.
+
+  --- *superseded, kept for the reasoning:* ---
+
 - **Registration is skipped on the launch the updater performs (v0.6.2-beta, 2026-07-31).** After
   updating 0.6.1 → 0.6.2 in place, the app was running 0.6.2 while the installed-apps entry still read
   `DisplayVersion 0.6.1-beta`. The key's last-write time was 2026-07-30 17:55:52 — the *previous*

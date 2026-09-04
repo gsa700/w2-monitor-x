@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using W2.Core;
 
@@ -468,22 +469,30 @@ public static class InstallService
 
         var dir = Path.GetDirectoryName(exePath)!;
 
-        var wrote = WriteUninstallEntry(exePath, dir, out var importExit);
-        var verified = wrote && IsRegistered();
+        // Verified against the version we just wrote, not merely against the key existing. The old
+        // check asked whether DisplayName was present — and it was, left over from a previous
+        // release — so an import that returned success and changed nothing still passed, and the
+        // registration log recorded "ok" for a write that never landed (BACKLOG, 2026-09-04).
+        var expected = UpdateService.CurrentVersion;
+        var wrote = WriteUninstallEntry(exePath, dir, out var importExit, out var importOutput);
+        var landed = RegisteredVersion();
+        var verified = wrote && landed == expected;
         var retried = false;
         if (!verified)
         {
             retried = true;
             Thread.Sleep(250);
-            wrote = WriteUninstallEntry(exePath, dir, out importExit);
-            verified = wrote && IsRegistered();
+            wrote = WriteUninstallEntry(exePath, dir, out importExit, out importOutput);
+            landed = RegisteredVersion();
+            verified = wrote && landed == expected;
         }
 
         CreateShortcut(StartMenuShortcut, exePath, dir, Description);
         EnsureDesktopShortcut(exePath, dir);
 
-        detail = $"reg import exit {importExit}{(retried ? ", after retry" : "")}" +
-                 (verified ? "" : wrote ? ", but the verify query found no entry" : "");
+        detail = $"reg import exit {importExit}{(retried ? " (after retry)" : "")}; " +
+                 $"entry now {landed ?? "(absent)"}, expected {expected}" +
+                 (importOutput.Length > 0 ? $"; reg said: {importOutput}" : "");
         return verified;
     }
 
@@ -502,7 +511,7 @@ public static class InstallService
     /// The file goes to the temp directory as UTF-16 with a BOM — <c>reg import</c> reads ANSI too,
     /// but only Unicode survives a user profile path with non-ASCII characters in it.
     /// </remarks>
-    private static bool WriteUninstallEntry(string exePath, string dir, out int importExit)
+    private static bool WriteUninstallEntry(string exePath, string dir, out int importExit, out string importOutput)
     {
         importExit = -1;
         var values = new List<RegValue>
@@ -526,16 +535,17 @@ public static class InstallService
         var sizeKb = FileSizeKb(exePath);
         if (sizeKb > 0) values.Add(RegFile.Dword("EstimatedSize", sizeKb));
 
+        importOutput = "";
         var file = Path.Combine(Path.GetTempPath(), "w2monitor-register.reg");
         try
         {
             File.WriteAllText(file, RegFile.Build(UninstallKey, values), new UnicodeEncoding(false, true));
-            importExit = Run(RegExe, ["import", file]);
+            (importExit, importOutput) = RunCaptured(RegExe, ["import", file]);
             return importExit == 0;
         }
         // -2 and -3 mark "never got as far as reg.exe", which reads differently from an exit code.
-        catch (IOException) { importExit = -2; return false; }
-        catch (UnauthorizedAccessException) { importExit = -3; return false; }
+        catch (IOException) { importExit = -2; importOutput = "write failed"; return false; }
+        catch (UnauthorizedAccessException) { importExit = -3; importOutput = "access denied"; return false; }
         finally
         {
             try { File.Delete(file); } catch { /* a leftover in temp is not worth failing over */ }
@@ -744,7 +754,20 @@ public static class InstallService
     private static string RegExe => Path.Combine(Environment.SystemDirectory, "reg.exe");
 
     /// <summary>Run a console tool with no window and return its exit code (-1 if it wouldn't start).</summary>
-    private static int Run(string fileName, IEnumerable<string> arguments)
+    private static int Run(string fileName, IEnumerable<string> arguments) =>
+        RunCaptured(fileName, arguments).Code;
+
+    /// <summary>
+    /// Run a console tool and return its exit code together with everything it printed. Both streams
+    /// are drained before waiting: redirecting a pipe and never reading it is how a child that prints
+    /// more than the buffer holds ends up blocked on write while the parent blocks in WaitForExit.
+    /// reg.exe prints far too little for that today, which is exactly the kind of "fine until it
+    /// isn't" that is cheaper to fix than to remember.
+    ///
+    /// The output matters for diagnosis: reg.exe writes "The operation completed successfully." to
+    /// **stderr**, so stderr carrying text is not by itself a failure signal.
+    /// </summary>
+    private static (int Code, string Output) RunCaptured(string fileName, IEnumerable<string> arguments)
     {
         var psi = new ProcessStartInfo
         {
@@ -759,11 +782,29 @@ public static class InstallService
         try
         {
             using var p = Process.Start(psi);
-            if (p is null) return -1;
+            if (p is null) return (-1, "");
+            var stdout = p.StandardOutput.ReadToEnd();
+            var stderr = p.StandardError.ReadToEnd();
             p.WaitForExit();
-            return p.ExitCode;
+            return (p.ExitCode, (stdout + " " + stderr).Trim());
         }
-        catch (System.ComponentModel.Win32Exception) { return -1; }
+        catch (System.ComponentModel.Win32Exception) { return (-1, ""); }
+    }
+
+    /// <summary>
+    /// The <c>DisplayVersion</c> actually recorded in the installed-apps entry, or null if the key or
+    /// the value isn't there. Read back rather than assumed: an import that reports success and
+    /// changes nothing is indistinguishable from one that worked unless the result is checked.
+    /// </summary>
+    private static string? RegisteredVersion()
+    {
+        if (!OperatingSystem.IsWindows()) return null;
+        var (code, output) = RunCaptured(RegExe, ["query", UninstallKey, "/v", "DisplayVersion"]);
+        if (code != 0) return null;
+        // reg query prints: "    DisplayVersion    REG_SZ    1.0.0-beta1". Neither the value name nor
+        // the type is localised, so matching on them is safe on any Windows UI language.
+        var m = Regex.Match(output, @"DisplayVersion\s+REG_SZ\s+(?<v>\S.*?)\s*$", RegexOptions.Multiline);
+        return m.Success ? m.Groups["v"].Value.Trim() : null;
     }
 
     /// <summary>
