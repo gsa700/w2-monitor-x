@@ -5,6 +5,23 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+## [1.0.0-beta1] - 2026-09-04
+
+The first 1.0 candidate, and the first build meant for stations other than the one it was written on.
+Feature work is essentially done; what follows depends on what testers find.
+
+### Fixed
+- **The update check understands pre-release versions.** It compared versions by truncating at the
+  first dash, which was fine while every release was `X.Y.Z-beta` and the numbers always moved. Under
+  a `-beta1`, `-beta2` scheme the numbers hold still and the suffix carries the difference, so
+  `1.0.0-beta1`, `1.0.0-beta2` and `1.0.0` all compared equal — anyone on beta1 would have been told
+  they were up to date forever, including once the real 1.0 shipped. Ordering now follows semantic
+  versioning: a pre-release ranks below the release it precedes, and trailing digits compare as
+  numbers, so `beta10` follows `beta2` instead of preceding it. (`VersionOrder` in W2.Core, 25 tests.)
+
+  Upgrading from any earlier release is unaffected — 0.9.0-beta and before are ordered by their
+  numbers, which still move.
+
 ### Added
 - **The meter's own firmware version is shown in Setup → Updates.** Read with the W2's `V` command once
   per connection — the manual marks it "EEPROM: No", so it writes nothing and can be asked on every

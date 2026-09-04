@@ -83,9 +83,10 @@ public static class UpdateService
                 }
             }
 
-            var cur = ParseVer(CurrentVersion);
-            var lat = ParseVer(info.LatestTag);
-            info.UpdateAvailable = cur is not null && lat is not null && lat > cur;
+            // Ordering lives in W2.Core so pre-release suffixes are covered by tests rather than by
+            // hope: the comparison this replaced truncated at the dash, which made 1.0.0-beta1,
+            // 1.0.0-beta2 and 1.0.0 indistinguishable.
+            info.UpdateAvailable = VersionOrder.IsNewer(info.LatestTag, CurrentVersion);
         }
         catch (Exception ex)
         {
@@ -180,11 +181,4 @@ public static class UpdateService
         return false;
     }
 
-    private static Version? ParseVer(string s)
-    {
-        var t = s.TrimStart('v', 'V');
-        var dash = t.IndexOf('-');
-        if (dash >= 0) t = t[..dash];
-        return Version.TryParse(t, out var v) ? v : null;
-    }
 }
