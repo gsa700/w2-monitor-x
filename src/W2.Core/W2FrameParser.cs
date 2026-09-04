@@ -30,6 +30,15 @@ public static class W2FrameParser
     private static readonly Regex SwrRx = new(@"^[Ss](\d+)", RegexOptions.Compiled);
     private static readonly Regex TripRx = new(@"[\[\]](\d+)", RegexOptions.Compiled);
 
+    /// <summary>
+    /// Firmware reply. The manual (Serial Interface Commands Rev D) specifies <c>Vn.nn;</c> with the
+    /// version running 0.01 to 9.99, so <c>\d\.\d\d</c> would match the documented range exactly —
+    /// this is deliberately looser. A two-digit major or a third decimal in some future firmware
+    /// should show up in Setup as whatever it says, not vanish because the pattern was written to the
+    /// 2010 revision of the document.
+    /// </summary>
+    private static readonly Regex FirmwareRx = new(@"^[Vv](\d+\.\d+)", RegexOptions.Compiled);
+
     private static readonly Dictionary<char, (string Name, double FullScale)> Range = new()
     {
         ['1'] = ("2 W", 2.0),
@@ -68,6 +77,17 @@ public static class W2FrameParser
     }
 
     /// <summary>SWR-alarm trip point echo: "[nn;" / "]nn;" → nn/10 (1.1–5.0). Null if unmatched.</summary>
+    /// <summary>
+    /// Firmware version from a <c>V</c> reply: <c>"V1.03;"</c> → <c>"1.03"</c>. Null if the reply
+    /// isn't one — which is also how <see cref="W2Probe"/> decides a port isn't a W2 at all.
+    /// </summary>
+    public static string? Firmware(string? reply)
+    {
+        if (string.IsNullOrEmpty(reply)) return null;
+        var m = FirmwareRx.Match(reply.TrimStart());
+        return m.Success ? m.Groups[1].Value : null;
+    }
+
     public static double? AlarmTrip(string? reply)
     {
         if (string.IsNullOrEmpty(reply)) return null;

@@ -40,6 +40,13 @@ public sealed record W2Reading
     public bool? AlarmLock { get; init; }      // locking (latches until reset) vs non-locking
     public double? AlarmTrip { get; init; }    // trip point 1.1–5.0; drives the SWR bar coloring
 
+    /// <summary>
+    /// The meter's firmware version, e.g. "1.03". Read once when the link comes up and carried on
+    /// every reading thereafter — it cannot change while the meter is connected. Null until read, and
+    /// on a meter that answered <c>V</c> with something unrecognised.
+    /// </summary>
+    public string? Firmware { get; init; }
+
     /// <summary>Raw, non-printable-stripped I reply (kept for diagnostics).</summary>
     public string RawInfo { get; init; } = string.Empty;
 

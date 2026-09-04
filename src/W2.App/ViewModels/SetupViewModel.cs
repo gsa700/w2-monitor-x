@@ -52,6 +52,7 @@ public sealed class SetupViewModel : ViewModelBase
         UpdateCommand = new RelayCommand(() => _ = UpdateButtonAsync(), () => !_updateBusy);
         OpenReleaseCommand = new RelayCommand(OpenRelease);
         ShowCrashLogCommand = new RelayCommand(ShowCrashLog);
+        OpenElecraftCommand = new RelayCommand(OpenElecraft);
         UpdateStatus = $"You have {UpdateService.CurrentVersion}.";
 
         RefreshPorts();
@@ -111,6 +112,7 @@ public sealed class SetupViewModel : ViewModelBase
     public RelayCommand UpdateCommand { get; }
     public RelayCommand OpenReleaseCommand { get; }
     public RelayCommand ShowCrashLogCommand { get; }
+    public RelayCommand OpenElecraftCommand { get; }
 
     // W2 control lamp state (reflects the selected meter).
     public bool CanControl => SelectedRow?.Meter is { IsConnected: true };
@@ -277,6 +279,7 @@ public sealed class SetupViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(ToggleConnectLabel));
         OnPropertyChanged(nameof(MultipleMeters));
+        OnPropertyChanged(nameof(MeterFirmware));
         ToggleConnectCommand.RaiseCanExecuteChanged();
         ResetPeakCommand.RaiseCanExecuteChanged();
         ResetAllPeaksCommand.RaiseCanExecuteChanged();
@@ -314,6 +317,23 @@ public sealed class SetupViewModel : ViewModelBase
         InstallService.LastAttempt is { Succeeded: false } ? Palette.RedBrush
         : InstallService.LastAttempt is { } a && a.Version != UpdateService.CurrentVersion ? Palette.AmberBrush
         : Palette.DimBrush;
+
+    /// <summary>
+    /// Firmware of each connected meter, one line each. Read from the meter once when the link comes
+    /// up, so a just-connected meter reads "reading…" for the fraction of a second before its first
+    /// reading lands — this refreshes from <see cref="Sync"/>, which the manager raises on that first
+    /// reading precisely so per-meter state stops showing its connect-time value forever.
+    /// </summary>
+    public string MeterFirmware
+    {
+        get
+        {
+            var connected = _manager.Meters.Where(m => m.IsConnected).ToList();
+            if (connected.Count == 0) return "No meter connected.";
+            return string.Join("\n", connected.Select(m =>
+                m.Firmware is { } fw ? $"{m.Name} — firmware {fw}" : $"{m.Name} — reading…"));
+        }
+    }
 
     /// <summary>
     /// When the newest recorded crash happened, read once at construction — which is startup, before
@@ -405,6 +425,17 @@ public sealed class SetupViewModel : ViewModelBase
     {
         var url = _updateInfo?.ReleaseUrl ?? $"https://github.com/{UpdateService.Repo}/releases/latest";
         try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { /* ignore */ }
+    }
+
+    /// <summary>
+    /// Elecraft's site, where the manual says the free W2 Utility is downloaded from. Deliberately the
+    /// bare domain, which is what the Owner's Manual cites — a guessed deep link to a product page is
+    /// the kind of thing that rots quietly and sends a user to a 404.
+    /// </summary>
+    private static void OpenElecraft()
+    {
+        try { Process.Start(new ProcessStartInfo("https://www.elecraft.com") { UseShellExecute = true }); }
+        catch { /* ignore */ }
     }
 
     /// <summary>

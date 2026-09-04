@@ -5,6 +5,15 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+### Added
+- **The meter's own firmware version is shown in Setup → Updates.** Read with the W2's `V` command once
+  per connection — the manual marks it "EEPROM: No", so it writes nothing and can be asked on every
+  connect, including mid-transmission. Each connected meter is listed with its version. The app
+  deliberately does **not** offer to update it, and says why: a W2 only accepts a firmware load when it
+  is powered on with the SENSOR button held, so no software on a normal serial connection can flash it.
+  It names Elecraft's free W2 Utility and links to their site instead. Verified against both station
+  meters, which report 1.07.
+
 ## [0.9.0-beta] - 2026-08-02
 
 Groundwork for putting the app in front of testers: a crash now leaves something behind that can be

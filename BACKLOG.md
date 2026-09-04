@@ -4,6 +4,28 @@ Dogfooding feedback and small improvements, batched into releases.
 
 ## Open
 
+- **Decide whether to tell users their W2 firmware is behind** *(deferred 2026-09-04, when the readout
+  was added)* — Setup now reports the meter's version but never judges it. Whether that is enough turns
+  on a question the beta round is about to answer.
+
+  *Field data so far, and it argues for doing something.* Both station meters run **1.07**, but both
+  **shipped from the factory on 1.04** — one bought years ago, the other recently — so 1.04 is what a
+  W2 arrives with and is probably what most of them in the wild still run. The Serial Interface
+  Commands document is Rev D, April 2010, "applies to firmware rev 1.00 or higher", so there is real
+  spread between what ships and what exists. A user on 1.04 would genuinely benefit from being told.
+
+  *What blocks it is honesty, not effort.* There is no machine-readable source for "latest W2
+  firmware" — Elecraft distributes it through the W2 Utility, not a feed. So a check can only compare
+  against a number baked into the build, and that fails in the worst direction: once it goes stale it
+  reports "up to date" to someone who is not, which is worse than saying nothing because it stops them
+  looking. Two shapes that stay honest: a constant phrased as *"newest known when this build shipped"*
+  and never as *"up to date"*; or a small JSON in this repo fetched the way `UpdateService` already
+  fetches releases, which can be corrected without shipping an app release.
+
+  *Wait for the sample.* Two meters from one station, both on the same version, is the worst possible
+  basis for this. Testers' meters are the data — if they come back spread across 1.04 to 1.07, build
+  it; if everyone is on 1.07, there is nothing to report. (`W2FrameParser.Firmware`, `SetupViewModel`.)
+
 - **Uninstall leaves the single-file extraction directory behind** *(found on the CM5, 2026-08-02)* —
   a self-contained single-file build unpacks its native libraries to `$HOME/.net/<AppName>/<hash>/` on
   Linux (`%TEMP%\.net\…` on Windows), and `Uninstall` knows nothing about it. The hash changes with

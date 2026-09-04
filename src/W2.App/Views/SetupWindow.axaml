@@ -251,6 +251,18 @@
 
           <CheckBox Content="Check for updates at startup" IsChecked="{Binding CheckUpdatesAtStartup, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
 
+          <!-- The meter's own firmware, which is a different thing from this app's version and not
+               something this app can change: the W2 only accepts a firmware load when it is powered on
+               with the SENSOR button held (Owner's Manual Rev D3), so no software on a normal serial
+               connection can do it. Read with the V command once per connection. -->
+          <TextBlock Text="METER FIRMWARE" FontSize="12" FontWeight="Bold"
+                     Foreground="{StaticResource DimBrush}" Margin="0,8,0,0"/>
+          <TextBlock Text="{Binding MeterFirmware}" Foreground="{StaticResource TextBrush}"
+                     FontFamily="Consolas" TextWrapping="Wrap"/>
+          <TextBlock Text="Updating a W2 needs Elecraft's free W2 Utility, and the meter has to be powered on with the SENSOR button held to accept it — so it can't be done from here."
+                     Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
+          <Button Content="Elecraft website" Command="{Binding OpenElecraftCommand}" HorizontalAlignment="Left"/>
+
           <!-- Whether this copy is listed in the OS's installed-apps list. Shown for an installed
                copy only, and worth showing even when it's fine: the fault it exists to catch is one
                where nothing appears to be wrong. -->

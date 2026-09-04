@@ -65,6 +65,12 @@ public sealed class MeterService : IDisposable
     public bool? Search => Current?.Search;
     public bool? AlarmLock => Current?.AlarmLock;
     public double? AlarmTrip => Current?.AlarmTrip;
+
+    /// <summary>
+    /// Meter firmware, e.g. "1.03". Read once when the link comes up, so it is null until the first
+    /// reading arrives and again after a disconnect clears <see cref="Current"/>.
+    /// </summary>
+    public string? Firmware => Current?.Firmware;
     private int _rangeStep;
 
     /// <summary>Elapsed of the current over (live) or the last completed one.</summary>

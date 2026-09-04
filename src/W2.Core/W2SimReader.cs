@@ -24,6 +24,12 @@ public sealed class W2SimReader : IReadingSource
     /// <param name="phaseOffsetSeconds">Shifts the idle/TX cycle so multiple sims alternate overs.</param>
     public W2SimReader(double phaseOffsetSeconds = 0) => _phaseOffset = phaseOffsetSeconds;
 
+    /// <summary>
+    /// What the simulator reports for the V command. Any value the real parser accepts will do; this
+    /// is the revision the Serial Interface Commands document is written to.
+    /// </summary>
+    private const string SimFirmware = "1.00";
+
     public event Action<W2Reading>? ReadingReceived;
     public event Action<string, bool>? StatusChanged;
 
@@ -106,8 +112,11 @@ public sealed class W2SimReader : IReadingSource
             // Occasional serial dropout: a field comes back empty this cycle.
             if (_rnd.NextDouble() < 0.04) { f = ""; r = ""; s = ""; }
 
+            // Firmware is reported like a real meter would: without it the Setup readout would sit on
+            // "reading…" for the life of a --sim session, since nothing ever answers V.
             ReadingReceived?.Invoke(W2FrameParser.Build(f, r, s, info)
-                with { Pep = _pep, Search = _search, AlarmLock = _alarmLock, AlarmTrip = _alarmTrip });
+                with { Pep = _pep, Search = _search, AlarmLock = _alarmLock, AlarmTrip = _alarmTrip,
+                       Firmware = SimFirmware });
             Thread.Sleep(TickMs);
         }
 

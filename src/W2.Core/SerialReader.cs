@@ -49,6 +49,7 @@ public sealed class SerialReader : IReadingSource
     private bool? _search;
     private bool? _alarmLock;      // SWR-alarm locking mode (A command)
     private double? _alarmTrip;    // SWR-alarm trip point 1.1–5.0 ([ / ] commands)
+    private string? _firmware;     // meter firmware, read once per session (V command)
 
     public event Action<W2Reading>? ReadingReceived;
     public event Action<string, bool>? StatusChanged;  // (message, isError)
@@ -67,6 +68,7 @@ public sealed class SerialReader : IReadingSource
         _search = null;
         _alarmLock = null;
         _alarmTrip = null;
+        _firmware = null;
         _everConnected = false;
         while (_cmds.TryDequeue(out _)) { }
         _stop.Reset();
@@ -263,7 +265,8 @@ public sealed class SerialReader : IReadingSource
                 health.RecordCycle(f is not null || r is not null || s is not null || i is not null);
                 if (_linkFaulted) health.Fault();
                 ReadingReceived?.Invoke(W2FrameParser.Build(f, r, s, i)
-                    with { Pep = _pep, Search = _search, AlarmLock = _alarmLock, AlarmTrip = _alarmTrip });
+                    with { Pep = _pep, Search = _search, AlarmLock = _alarmLock, AlarmTrip = _alarmTrip,
+                           Firmware = _firmware });
                 if (WaitForStop(PollIntervalMs)) break;
             }
 
@@ -317,6 +320,13 @@ public sealed class SerialReader : IReadingSource
     /// </summary>
     private void ProbeToggleStates()
     {
+        // Firmware first, and outside the RF gate below. V is a pure query — the manual marks it
+        // "EEPROM: No" — so unlike the toggles it disturbs nothing, and a meter connected mid-over
+        // should still report its version rather than leave it blank until the next reconnect. This is
+        // the same command W2Probe uses to recognise a W2; the warning attached to it there is about
+        // asserting DTR/RTS on an unknown port that might be a radio, not about the command itself.
+        if (W2FrameParser.Firmware(Query('V')) is { } fw) _firmware = fw;
+
         // Decode through W2FrameParser rather than a second copy of the F-reply format: it anchors the
         // match and uses TryParse, where the copy that used to live here was unanchored and would throw
         // on an overlong digit run — inside RunSession's try, so a junk frame became a session teardown.
