@@ -55,7 +55,7 @@ than by whichever COM port Windows handed out this week:
 The W2 Controls tab. The meter picker at the top is the same selection as the Meters tab — pick a
 meter in either place and both follow, so there's never a doubt about which W2 a button is about to
 act on. Lit buttons show the meter's current state: here W2 #1 has Auto Sensor, Auto Range and its
-sampler LEDs on, and is in PEP rather than average:
+sampler LEDs on, and the Avg/PEP button reads its current mode — average:
 
 ![The W2 Controls tab](docs/controls.png)
 
@@ -71,13 +71,6 @@ The SWR alarm firing. Past the trip point the SWR bar turns red and the alarm re
 line — the same condition that drives the W2's rear-panel keyline-disconnect relay:
 
 ![The SWR alarm firing](docs/linux-alarm.png)
-
-The Display tab. Peak reset acts on the meter picked here, which is the same selection the Meters and
-W2 Controls tabs use, so it can't disagree with them. "Reset all peaks" appears once a second meter
-is configured, because with a single window the peak reported is the highest across every connected
-meter:
-
-![The Display tab](docs/linux-display.png)
 
 ## Install
 
