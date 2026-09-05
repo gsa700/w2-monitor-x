@@ -5,6 +5,12 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+## [1.0.0-beta3] - 2026-09-04
+
+The build for the tester round. One design change, made after finding why a Windows install kept
+losing its Settings → Apps entry: the app stops pretending to have one, and removal moves into the app
+where nothing outside it can interfere. Nothing on the serial or protocol side changed.
+
 ### Removed
 - **The Windows installed-apps entry, and everything that wrote it.** The app no longer appears in
   Settings → Apps → Installed apps, on purpose. It used to register itself there, and for two months the
