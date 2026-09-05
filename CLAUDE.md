@@ -99,6 +99,15 @@ Each W2 is followed by its USB chip serial: FTDI serial pinning on **Windows** (
 
   **Never run Detect to work out which adapter is which** — it sends `V` and may key a radio,
   and two of these are transmitters. Read the table, or ask.
+- **Windows registry writes from a shell launch are virtualised by the Program Compatibility
+  Assistant** and never reach the real registry — reg.exe and in-process alike, children included. The
+  app cannot tell from inside; its own read-back sees the overlay. This is why the installed-apps entry
+  goes stale or missing on Windows and why `registration.log` says `ok` when it isn't. Proven
+  2026-09-04 after two months; the manifest opt-out and both in-app workarounds were tested and do not
+  help, and clearing PCA's records does nothing. The untested lever is an Authenticode signature. Full
+  account and the ruled-out list in `BACKLOG.md` — **read it before re-investigating anything
+  registry-shaped, and do not trust a registration result observed from a developer shell**, which is
+  the one launch context that is never affected.
 - Cross-platform validated on real hardware: **Windows, Pi CM5 (linux-arm64), Fedora (linux-x64)**.
 - A Pi-side Claude session has worked this repo too (`HANDOFF-PI.md`); the two boxes sync via git
   (`main`, two-way pull/push). Keep `main` clean and rebased-friendly.

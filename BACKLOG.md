@@ -97,40 +97,79 @@ Dogfooding feedback and small improvements, batched into releases.
   ordinary pure state-machine logic over a reading stream and would port cleanly. A peak-targeting
   bug has already shipped once (v0.4.1-beta's Reset Peak fix). (`MeterService` → `W2.Core`.)
 
-- **The installed-apps entry sometimes doesn't get written, and until 2026-09-04 the app couldn't tell.**
-  *Detector fixed and shipped; the underlying fault is not currently reproducible.* Read this section
-  before spending time on it — three plausible explanations are already dead.
+- **ROOT CAUSE FOUND: Windows' Program Compatibility Assistant virtualises this app's registry
+  writes whenever it is launched through the shell** *(proven 2026-09-04)*. Read this before touching
+  anything registry-related. It explains every registration anomaly since July, and both obvious
+  in-app workarounds have already been tested and shown not to work.
 
-  *What 2026-09-04 established.* The `--updated` instrumentation finally caught an update relaunch, and
-  the answer was neither of the two hypotheses recorded below. The log said
-  `1.0.0-beta1 update ok reg import exit 0` — so the call **runs** on the updater's relaunch, and
-  reg.exe **returns success** — while the registry key had not been touched since 2026-08-02. So the
-  failure is not "skipped" and not "reg.exe refused": the import reports success and nothing lands.
+  *What happens.* When W2Monitor.exe is started from Explorer — desktop shortcut, Start Menu, a
+  double-click — or by the updater's PowerShell helper, PCA attaches the `DetectorsAppHealth`
+  compatibility layer (visible as `__COMPAT_LAYER=DetectorsAppHealth` in the process environment,
+  though it is also applied without that variable). Under it, **every registry write goes to a
+  per-launch-tree overlay**: `reg import`, `reg add`, and in-process `RegSetValueEx` alike. Reads
+  from the same tree are served from the overlay, so the app writes the installed-apps entry, reads
+  the new version straight back, and logs `ok` — while the real key has not changed. The overlay is
+  discarded when the tree exits. A child spawned by the layered process inherits the overlay even when
+  started by plain `CreateProcess` with `__COMPAT_LAYER` removed. None of it is logged by Defender or
+  PCA anywhere a person would look.
 
-  *Why every log line said `ok`.* `IsRegistered()` asked only whether `DisplayName` existed. It did,
-  left over from an earlier release, so an import that changed nothing still passed the check and
-  `Register` returned true. The instrument was asking the wrong question — presence, not freshness —
-  and had been reporting success for writes that never happened. **Fixed:** registration now reads
-  `DisplayVersion` back and compares it to the running version, and the log carries reg.exe's own
-  words alongside its exit code.
+  *What it explains.* The entry "written and then vanished" after the 0.6.0 install (July): written to
+  the overlay, gone on exit. Every "ok" line in `registration.log` from a shell launch since: real.
+  The three consecutive update relaunches that "didn't register": they did, into the overlay. The
+  read-back verification added in v1.0.0-beta2 passing while the key stayed stale: it read the
+  overlay. Why manual launches from a developer shell always worked: that launch tree was never
+  PCA'd. Why the key's last-write timestamp sat a month in the past while the app reported success
+  minute by minute.
 
-  *Not reproducible after the fact.* Three attempts on 2026-09-04 (22:32, 22:52, 23:00) reported `ok`
-  without writing. A probe reproducing the app's exact file, path, encoding and command **landed**
-  minutes later, and the rebuilt app then registered correctly on a normal start. Nothing identified
-  distinguishes the failing attempts from the succeeding ones, and the failure has not recurred. Do
-  not assume the read-back fixed it — it fixed the *reporting*. If the next occurrence still says
-  `FAILED … entry now X, expected Y`, that is the detector working, not a regression.
+  *How it was proven.* A 120 ms watcher on the real key recorded zero changes across a shell launch
+  whose log line reported a verified write. A self-contained probe reproducing the app's exact steps,
+  double-clicked from the Desktop, reported the layer, imported a marker, read it back, and left the
+  real key untouched; the identical binary launched from a developer shell had no layer and wrote
+  through. The registry-key timestamp instrument was itself validated by writing a value and watching
+  it move.
 
-  *Also ruled out, from the earlier rounds:* a manual launch of the same installed binary registers
-  correctly (verified repeatedly); the helper's relaunch is a plain `Start-Process` with no redirection
-  or altered token; the release that changed that line sits *after* the first miss; `Mode` derives from
-  paths that don't vary between launches; and the `.reg` file the app writes imports cleanly when
-  replayed by hand.
+  *Ruled out, with evidence — do not retest:* a different user or hive (same SID); UAC virtualisation
+  (allowed, not enabled, both processes); a VirtualStore copy; a duplicate key anywhere in HKCU or
+  HKLM; anything reverting the value (watched for 30 s); Defender remediation (no events); ASR (no
+  rules configured); an AppCompat `Layers` entry (both hives empty); a compat flag on the shortcuts;
+  integrity level (both Medium); TEMP or any other environment difference (PEB compared, only
+  Explorer's inherited noise).
 
-  *Severity stays low.* Only `DisplayVersion` and `EstimatedSize` go stale. `UninstallString` and
-  `InstallLocation` are path-based and stay correct, so removal through Settings keeps working.
+  *Levers tested and found NOT to work:*
+  - **A `<compatibility>` manifest with `supportedOS` for Windows 10/11** — the documented PCA opt-out.
+    Verified as the active `RT_MANIFEST` resource in the installed exe, and separately in a probe with
+    no PCA Store entry. Both still received the layer. The section stays in `app.manifest` because it
+    is correct hygiene, and its comment says plainly that it does not fix this.
+  - **In-process `RegSetValueEx` instead of `reg.exe`** — virtualised identically.
+  - **Spawning a child with `__COMPAT_LAYER` scrubbed via `CreateProcess`** — the child inherited the
+    overlay and its writes stayed there.
+  - **Clearing PCA's Store entries** — pointless: PCA re-adds a program the moment it is launched
+    through the shell (both probes appeared in the Store after one run each). The Store records
+    monitoring; it does not cause it.
 
-  --- *superseded, kept for the reasoning:* ---
+  *The one lever left, untested:* **an Authenticode signature.** On this machine every process
+  carrying the layer is unsigned (W2Monitor and all three probes: `NotSigned`) and every
+  shell-launched process without it is signed (FlexRadio's CAT and DAX: `Valid`). Manifest, Store
+  status and environment do not separate the two groups; a signature does. Testing it needs a code-
+  signing certificate, which is a cost and an identity-verification process, so it is David's call.
+
+  *What this means for testers.* Every Windows tester runs an unsigned exe from the shell, so on
+  every tester machine the Settings → Apps entry will be missing or stale, and `registration.log`
+  will say `ok`. That is cosmetic **except** that Settings → Apps is currently the *only* route to
+  uninstall — there is no button in the app. So a tester who wants to remove it has no way to do so
+  short of `--uninstall` on a command line they don't know exists. **An uninstall control in Setup is
+  therefore required before the beta round, not optional**, and it must not depend on the registry.
+
+  *Honest logging is also possible now.* The app can detect `__COMPAT_LAYER` in its own environment
+  and, when present, record that its registry writes are probably virtualised and its own read-back
+  cannot be trusted — rather than `ok`. It will miss the launches that get the layer without the
+  variable, so it is a partial signal, but a partial true signal beats a confident false one.
+
+  *Severity for the app itself:* nil. The program runs, updates and reads meters regardless; only the
+  installed-apps listing is affected. (`InstallService`, `app.manifest`; probe sources in the session
+  scratchpad, not the repo.)
+
+  --- *superseded by the above, kept for the reasoning that led there:* ---
 
 - **Registration is skipped on the launch the updater performs (v0.6.2-beta, 2026-07-31).** After
   updating 0.6.1 → 0.6.2 in place, the app was running 0.6.2 while the installed-apps entry still read
