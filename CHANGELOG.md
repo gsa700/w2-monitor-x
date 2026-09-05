@@ -5,6 +5,32 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+### Removed
+- **The Windows installed-apps entry, and everything that wrote it.** The app no longer appears in
+  Settings → Apps → Installed apps, on purpose. It used to register itself there, and for two months the
+  entry kept turning up missing or stale while the app's own log insisted it had been written. The cause
+  was found on 2026-09-04: whenever the app is launched from Explorer or by the updater's helper, Windows'
+  Program Compatibility Assistant attaches a compatibility layer to this unsigned exe that virtualises
+  **every** registry write — reg.exe, in-process API calls, and any child process — into an overlay the
+  app reads back consistently and loses on exit. So it wrote the entry, verified it, reported success,
+  and the real registry never changed. The documented manifest opt-out, in-process writes and a
+  self-relaunch with the layer stripped were each tested and none escaped it. The only untested lever is
+  a code-signing certificate. Rather than ship a feature that reports success while doing nothing, it was
+  removed: `RegFile`, `RegistrationLog`, `registration.log`, the reg.exe plumbing and their 22 tests are
+  gone. Start Menu and desktop shortcuts are files, were never affected, and stay. Linux is untouched.
+
+### Added
+- **Remove W2 Monitor… in Setup → Updates.** Removal now lives in the app, where it depends on nothing
+  outside it: the same confirm-and-clean-up flow `--uninstall` runs, including the question about
+  keeping your settings. Shown for an installed copy only. On Windows this is now the way to uninstall;
+  `--uninstall` still works from a command line, and Linux keeps its menu entry as before.
+
+### Changed
+- The install offer says plainly that the app will not appear in Settings → Apps and where to remove
+  it from, rather than leaving that to be discovered.
+- The updater's helper no longer passes `--updated` on relaunch; nothing reads it now. Older helpers
+  that still pass it are harmless, since unknown arguments are ignored.
+
 ## [1.0.0-beta2] - 2026-09-04
 
 One fix, in the machinery that reports whether this copy is listed in Settings → Apps → Installed apps.

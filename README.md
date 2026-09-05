@@ -94,21 +94,23 @@ the in-app updater replaces the running program in place.
 | | Windows | Linux / Raspberry Pi |
 |---|---|---|
 | Goes in | `%LOCALAPPDATA%\Programs\W2 Monitor` | `~/.local/share/w2-monitor` |
-| Appears in | Settings → Apps → Installed apps, plus a Start Menu shortcut | your applications menu, plus a `~/.local/bin/w2-monitor` symlink |
-| Remove with | the entry in Installed apps | `w2-monitor --uninstall` |
+| Appears in | Start Menu and desktop shortcuts — **not** in Settings → Apps (see below) | your applications menu and desktop, plus a `~/.local/bin/w2-monitor` symlink |
+| Remove with | **Setup → Updates → Remove W2 Monitor…** | Setup → Updates → Remove, or `w2-monitor --uninstall` |
 
 Prefer to keep it where it is? Put an empty file named **`portable.txt`** beside the program and it
 will never ask again or touch anything outside its own folder. Uninstalling keeps your settings
 unless you explicitly say otherwise, and `--install` / `--uninstall` work unattended if you'd rather
 script it.
 
-**Want a shortcut on your desktop?** Installing doesn't put one there — it registers the app with your
-Start Menu (Windows) or applications menu (Linux), and a desktop icon is a matter of taste. Make one
-with your OS's own tools:
-- **Windows:** find **W2 Monitor** in the Start Menu, then drag it to the desktop — or right-click the
-  installed `W2Monitor.exe` → **Show more options** → **Send to** → **Desktop (create shortcut)**.
-- **Linux:** use your desktop's "add to favorites / create launcher" option, or copy
-  `~/.local/share/applications/w2-monitor.desktop` to your `Desktop` folder and mark it trusted.
+**Why isn't it in Settings → Apps?** On Windows the app deliberately doesn't register there. Windows
+applies a compatibility layer to unsigned programs launched from Explorer that silently discards their
+registry writes — the entry was being written, verified and lost on every launch, so rather than leave
+it claiming success it was taken out. Remove the app from **Setup → Updates** instead; that is also
+where you choose whether your settings go with it.
+
+The installer puts a shortcut on your desktop as well as in the Start Menu (or your applications menu
+on Linux). It never overwrites one you have changed, but if you delete it, the next launch puts a fresh
+one back.
 
 ## Requirements
 

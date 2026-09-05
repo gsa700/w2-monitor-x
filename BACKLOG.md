@@ -97,10 +97,18 @@ Dogfooding feedback and small improvements, batched into releases.
   ordinary pure state-machine logic over a reading stream and would port cleanly. A peak-targeting
   bug has already shipped once (v0.4.1-beta's Reset Peak fix). (`MeterService` → `W2.Core`.)
 
-- **ROOT CAUSE FOUND: Windows' Program Compatibility Assistant virtualises this app's registry
-  writes whenever it is launched through the shell** *(proven 2026-09-04)*. Read this before touching
-  anything registry-related. It explains every registration anomaly since July, and both obvious
-  in-app workarounds have already been tested and shown not to work.
+- **RESOLVED by removal (unreleased): Windows' Program Compatibility Assistant virtualises this app's
+  registry writes whenever it is launched through the shell** *(proven 2026-09-04)*. Read this before
+  touching anything registry-related. It explains every registration anomaly since July, and both
+  obvious in-app workarounds have already been tested and shown not to work.
+
+  *Resolution.* The installed-apps entry and everything that wrote it were removed the same day, on
+  David's call: install to the same per-user folder, keep the Start Menu and desktop shortcuts (files,
+  never affected), and remove from inside the app — a **Remove W2 Monitor…** button on Setup → Updates
+  runs the same flow as `--uninstall`. That closes the only real harm, which was a tester with no way
+  to uninstall. The registration code is one commit back in history should the exe ever be signed.
+  **LP-100A shares the code and the problem and should get the same treatment.** Everything below is
+  the investigation record, kept so nobody repeats it.
 
   *What happens.* When W2Monitor.exe is started from Explorer — desktop shortcut, Start Menu, a
   double-click — or by the updater's PowerShell helper, PCA attaches the `DetectorsAppHealth`

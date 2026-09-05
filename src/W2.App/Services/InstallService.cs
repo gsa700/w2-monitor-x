@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using W2.Core;
 
@@ -22,10 +21,10 @@ public readonly record struct UninstallOptions(bool RemoveSettings);
 /// <summary>Outcome of an install.</summary>
 /// <param name="ExePath">The installed executable.</param>
 /// <param name="Registered">
-/// Whether the desktop registration is verifiably in place. The install itself succeeded either
-/// way — the program is copied and runs — but when this is false it will not appear in Settings →
-/// Apps → Installed apps, which is the only route most people have to uninstall it. Worth telling
-/// the user about rather than reporting a clean install.
+/// Whether the desktop integration is in place: the Start Menu shortcut on Windows, the <c>.desktop</c>
+/// entry on Linux. The install itself succeeded either way — the program is copied and runs — but
+/// when this is false it has no menu entry, which is worth telling the user rather than reporting a
+/// clean install.
 /// </param>
 public readonly record struct InstallResult(string ExePath, bool Registered);
 
@@ -44,23 +43,21 @@ public sealed class InstallBlockedException(string message, Exception? inner = n
 /// running executable in place, which needs no elevation under %LOCALAPPDATA% and would need it on
 /// every single update under Program Files. A machine-wide install would quietly break the updater.
 ///
-/// The registry work shells out to <c>reg.exe</c> rather than using <c>Microsoft.Win32.Registry</c>.
-/// The app targets plain <c>net10.0</c> so it can cross-publish Linux and Raspberry Pi builds from
-/// one TFM, and the registry APIs only ship in <c>net10.0-windows</c>; the standalone package is
-/// deprecated and stuck at 5.0.0. Arguments go through <see cref="ProcessStartInfo.ArgumentList"/>,
-/// so paths with spaces need no hand-quoting. Same "Windows-only, guarded at runtime" shape the
-/// WMI adapter-serial code in <see cref="PortIdentity"/> already uses.
+/// There is deliberately <b>no installed-apps registry entry on Windows</b>, so the app does not appear
+/// in Settings → Apps and is removed from its own Setup instead. It used to write one, and from a shell
+/// launch the write never reached the registry: Windows' Program Compatibility Assistant attaches a
+/// compatibility layer to this unsigned exe whenever Explorer or the updater's helper starts it, and
+/// that layer virtualises every registry write — reg.exe and in-process alike, children included — into
+/// an overlay the process reads back consistently and loses on exit. So the app wrote the entry,
+/// verified it, and reported success, and the real key never changed. A manifest opt-out, in-process
+/// writes and a scrubbed relaunch were all tested and none escaped it; the one untested lever is an
+/// Authenticode signature. Rather than ship a feature that reports success while doing nothing, the
+/// registry was taken out (BACKLOG, 2026-09-04). If the exe is ever signed, the registration code is
+/// one commit back in history. Windows integration is therefore shortcuts only, which are files and
+/// were never affected.
 /// </summary>
 public static class InstallService
 {
-    /// <summary>
-    /// Registry key under HKCU that puts the app in Settings → Apps → Installed apps. Spelled with
-    /// the full hive name because the <c>.reg</c> file format requires it; <c>reg.exe</c> accepts
-    /// either form on its command line, so one constant serves both.
-    /// </summary>
-    private const string UninstallKey =
-        @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Uninstall\W2Monitor";
-
     /// <summary>Display name, used for the installed-apps entry and the Start Menu shortcut.</summary>
     public const string DisplayName = "W2 Monitor";
 
@@ -227,83 +224,14 @@ public static class InstallService
     }
 
     /// <summary>
-    /// Register the copy at <paramref name="exePath"/> with the desktop environment: an
-    /// installed-apps entry and Start Menu shortcut on Windows, a <c>.desktop</c> entry, icon and
-    /// <c>~/.local/bin</c> symlink on Linux. Safe to call repeatedly — everything overwrites rather
-    /// than duplicating.
+    /// Give the copy at <paramref name="exePath"/> its desktop integration: Start Menu and desktop
+    /// shortcuts on Windows; a <c>.desktop</c> entry, icon, <c>~/.local/bin</c> symlink and desktop
+    /// launcher on Linux. Safe to call repeatedly — everything overwrites or skips rather than
+    /// duplicating.
     /// </summary>
-    /// <returns>Whether the registration is verifiably in place afterwards.</returns>
-    public static bool Register(string exePath) => Register(exePath, "install");
-
-    /// <summary>
-    /// Register, and record what happened. <paramref name="trigger"/> is what prompted the attempt —
-    /// <c>startup</c>, <c>install</c> or <c>update</c> — which is the field that matters, because the
-    /// fault being chased is specific to one of them.
-    /// </summary>
-    /// <remarks>
-    /// Every path through here writes exactly one line, including the paths that previously returned
-    /// false or threw with nothing to show for it. That is the point: an attempt that leaves no trace
-    /// is indistinguishable from one that never happened, which is what made this take a registry
-    /// last-write timestamp to diagnose (BACKLOG, 2026-07-31).
-    /// </remarks>
-    public static bool Register(string exePath, string trigger)
-    {
-        var detail = "";
-        var ok = false;
-        try
-        {
-            ok = OperatingSystem.IsWindows()
-                ? RegisterWindows(exePath, out detail)
-                : RegisterUnix(exePath, out detail);
-        }
-        catch (Exception ex)
-        {
-            // Nothing here rethrows: registration has never been worth failing an install or a
-            // startup over. It is worth *recording*, which is the part that was missing.
-            detail = $"threw {ex.GetType().Name}: {ex.Message}";
-        }
-        RecordAttempt(trigger, ok, detail);
-        return ok;
-    }
-
-    /// <summary>The most recent attempt this process made, or the last one on file if it hasn't tried yet.</summary>
-    public static RegistrationAttempt? LastAttempt
-    {
-        get
-        {
-            if (_lastAttempt is not null) return _lastAttempt;
-            try
-            {
-                if (!File.Exists(LogFilePath)) return null;
-                return File.ReadAllLines(LogFilePath)
-                    .Select(RegistrationLog.Parse)
-                    .LastOrDefault(a => a is not null);
-            }
-            catch (IOException) { return null; }
-            catch (UnauthorizedAccessException) { return null; }
-        }
-    }
-
-    private static RegistrationAttempt? _lastAttempt;
-
-    /// <summary>Audit trail of registration attempts, beside the config it diagnoses alongside.</summary>
-    public static string LogFilePath => Path.Combine(ConfigStore.DataDir, "registration.log");
-
-    private static void RecordAttempt(string trigger, bool succeeded, string detail)
-    {
-        var attempt = new RegistrationAttempt(
-            DateTime.UtcNow, UpdateService.CurrentVersion, trigger, succeeded, detail);
-        _lastAttempt = attempt;
-
-        try
-        {
-            var existing = File.Exists(LogFilePath) ? File.ReadAllLines(LogFilePath) : [];
-            var kept = RegistrationLog.Tail(existing.Append(RegistrationLog.Format(attempt)));
-            File.WriteAllLines(LogFilePath, kept);
-        }
-        catch (IOException) { /* the in-memory copy still reaches the UI */ }
-        catch (UnauthorizedAccessException) { }
-    }
+    /// <returns>Whether the menu entry — the one piece that makes the app launchable — is on disk afterwards.</returns>
+    public static bool Register(string exePath) =>
+        OperatingSystem.IsWindows() ? RegisterWindows(exePath) : RegisterUnix(exePath);
 
     /// <returns>Whether the desktop entry is on disk afterwards — the icon and the
     /// <c>~/.local/bin</c> symlink are conveniences, but without the entry there is no menu item.</returns>
@@ -312,9 +240,8 @@ public static class InstallService
     /// cost that mattered was <c>update-desktop-database</c>, which is a process spawn and a directory
     /// rebuild; it now runs only when the entry's contents actually changed.
     /// </remarks>
-    private static bool RegisterUnix(string exePath, out string detail)
+    private static bool RegisterUnix(string exePath)
     {
-        var steps = new List<string>();
         // Write the icon first: the entry should not reference a file that isn't there yet. Only if
         // it's missing — the bytes are baked into this build and can't have drifted.
         string? icon = null;
@@ -338,7 +265,6 @@ public static class InstallService
         }
         catch (IOException) { /* an entry without an icon still launches */ }
         catch (UnauthorizedAccessException) { }
-        if (icon is null) steps.Add("no icon");
 
         var wanted = DesktopEntry.Build(DisplayName, exePath, icon, Description);
         var current = TryReadAllText(DesktopFilePath);
@@ -346,15 +272,10 @@ public static class InstallService
         {
             Directory.CreateDirectory(Path.GetDirectoryName(DesktopFilePath)!);
             File.WriteAllText(DesktopFilePath, wanted);
-            steps.Add("entry rewritten");
 
             // Some environments only notice a changed entry once the database is rebuilt; others watch
             // the directory. Best effort, and harmless where the tool isn't installed.
             Run("update-desktop-database", [Path.GetDirectoryName(DesktopFilePath)!]);
-        }
-        else
-        {
-            steps.Add("entry already current");
         }
 
         try
@@ -366,20 +287,17 @@ public static class InstallService
             // any launch. Symlink.ResolveTarget answers "no link" with null for that reason.
             Symlink.Ensure(SymlinkPath, exePath);
         }
-        catch (IOException ex) { steps.Add($"symlink failed: {ex.Message}"); }
-        catch (UnauthorizedAccessException ex) { steps.Add($"symlink failed: {ex.Message}"); }
+        catch (IOException) { /* the menu entry is the point; the symlink is a convenience */ }
+        catch (UnauthorizedAccessException) { }
 
-        steps.Add(EnsureDesktopShortcut(exePath, Path.GetDirectoryName(exePath)!));
+        EnsureDesktopShortcut(exePath, Path.GetDirectoryName(exePath)!);
 
-        var ok = File.Exists(DesktopFilePath);
-        if (!ok) steps.Add("no .desktop entry on disk afterwards");
-        detail = string.Join("; ", steps);
-        return ok;
+        return File.Exists(DesktopFilePath);
     }
 
     /// <summary>
-    /// Put a launcher on the desktop, unless something is already there. Returns a line for the
-    /// registration log.
+    /// Put a launcher on the desktop, unless something is already there. Returns a short note on
+    /// what it did, for diagnostics.
     /// </summary>
     /// <remarks>
     /// **Never overwrites.** An existing file at that path is the user's — they may have moved it,
@@ -452,142 +370,36 @@ public static class InstallService
     }
 
     /// <summary>
-    /// Write the installed-apps entry and the Start Menu shortcut. Returns whether the entry is
-    /// really there afterwards.
+    /// Windows integration is shortcuts only — Start Menu and desktop. There is deliberately no
+    /// installed-apps registry entry; see the class remarks. Returns whether the Start Menu shortcut,
+    /// the one that makes the app findable, is on disk afterwards.
     /// </summary>
-    /// <remarks>
-    /// Verified and retried rather than written once and assumed. This failed in the field on
-    /// LP-100A and left no trace: every value goes through a separate reg.exe, and a spawn that does
-    /// not take produces no error, no log line and no visible difference from success. The install
-    /// still copied the program and still launched — it simply did not appear in Settings → Apps →
-    /// Installed apps, which is the one route a user has to remove it.
-    /// </remarks>
-    private static bool RegisterWindows(string exePath, out string detail)
+    private static bool RegisterWindows(string exePath)
     {
-        detail = "";
-        if (!OperatingSystem.IsWindows()) { detail = "not Windows"; return false; }
-
+        if (!OperatingSystem.IsWindows()) return false;
         var dir = Path.GetDirectoryName(exePath)!;
-
-        // Verified against the version we just wrote, not merely against the key existing. The old
-        // check asked whether DisplayName was present — and it was, left over from a previous
-        // release — so an import that returned success and changed nothing still passed, and the
-        // registration log recorded "ok" for a write that never landed (BACKLOG, 2026-09-04).
-        var expected = UpdateService.CurrentVersion;
-        var wrote = WriteUninstallEntry(exePath, dir, out var importExit, out var importOutput);
-        var landed = RegisteredVersion();
-        var verified = wrote && landed == expected;
-        var retried = false;
-        if (!verified)
-        {
-            retried = true;
-            Thread.Sleep(250);
-            wrote = WriteUninstallEntry(exePath, dir, out importExit, out importOutput);
-            landed = RegisteredVersion();
-            verified = wrote && landed == expected;
-        }
-
         CreateShortcut(StartMenuShortcut, exePath, dir, Description);
         EnsureDesktopShortcut(exePath, dir);
-
-        detail = $"reg import exit {importExit}{(retried ? " (after retry)" : "")}; " +
-                 $"entry now {landed ?? "(absent)"}, expected {expected}" +
-                 (importOutput.Length > 0 ? $"; reg said: {importOutput}" : "");
-        return verified;
+        return File.Exists(StartMenuShortcut);
     }
 
     /// <summary>
-    /// Write the whole installed-apps entry in one <c>reg import</c>. Returns whether reg.exe said it
-    /// worked.
+    /// Called at every startup of an installed copy: re-asserts the Start Menu shortcut on Windows and
+    /// the menu entry, icon and symlink on Linux, so a copy adopted from a pre-installer folder gets its
+    /// integration without being reinstalled. Loose and portable copies are left alone.
     /// </summary>
-    /// <remarks>
-    /// One invocation rather than one per value, deliberately. Eleven separate <c>reg add</c> spawns
-    /// are eleven things that can individually fail to happen, and a spawn that silently doesn't take
-    /// is indistinguishable from one that did — which is the shape of the entry that was written and
-    /// then found missing (BACKLOG, 2026-07-30). It also makes the whole registration one action for a
-    /// security product to allow or block instead of eleven, and cheap enough to repeat on every
-    /// launch, which is what lets a lost entry heal itself.
-    ///
-    /// The file goes to the temp directory as UTF-16 with a BOM — <c>reg import</c> reads ANSI too,
-    /// but only Unicode survives a user profile path with non-ASCII characters in it.
-    /// </remarks>
-    private static bool WriteUninstallEntry(string exePath, string dir, out int importExit, out string importOutput)
+    public static void EnsureRegistered()
     {
-        importExit = -1;
-        var values = new List<RegValue>
-        {
-            RegFile.Sz("DisplayName", DisplayName),
-            RegFile.Sz("DisplayVersion", UpdateService.CurrentVersion),
-            RegFile.Sz("Publisher", "David Erickson (AB0R)"),
-            RegFile.Sz("DisplayIcon", exePath),
-            RegFile.Sz("InstallLocation", dir),
-            RegFile.Sz("URLInfoAbout", $"https://github.com/{UpdateService.Repo}"),
-
-            // Windows gives the user no way to answer a dialog it did not expect, so the entry's own
-            // button runs the quiet path — which keeps the settings.
-            RegFile.Sz("UninstallString", $"\"{exePath}\" --uninstall"),
-            RegFile.Sz("QuietUninstallString", $"\"{exePath}\" --uninstall --quiet"),
-
-            RegFile.Dword("NoModify", 1),
-            RegFile.Dword("NoRepair", 1),
-        };
-
-        var sizeKb = FileSizeKb(exePath);
-        if (sizeKb > 0) values.Add(RegFile.Dword("EstimatedSize", sizeKb));
-
-        importOutput = "";
-        var file = Path.Combine(Path.GetTempPath(), "w2monitor-register.reg");
-        try
-        {
-            File.WriteAllText(file, RegFile.Build(UninstallKey, values), new UnicodeEncoding(false, true));
-            (importExit, importOutput) = RunCaptured(RegExe, ["import", file]);
-            return importExit == 0;
-        }
-        // -2 and -3 mark "never got as far as reg.exe", which reads differently from an exit code.
-        catch (IOException) { importExit = -2; importOutput = "write failed"; return false; }
-        catch (UnauthorizedAccessException) { importExit = -3; importOutput = "access denied"; return false; }
-        finally
-        {
-            try { File.Delete(file); } catch { /* a leftover in temp is not worth failing over */ }
-        }
+        if (Mode != InstallMode.Installed) return;
+        Register(ExePath);
     }
 
     /// <summary>
-    /// Called at every startup. Adopts a copy that was put in an install directory by hand before
-    /// there was an installer — registering it where it stands rather than copying it to the
-    /// canonical folder, which would leave the original behind as an orphan — and re-asserts the
-    /// registration of an already-installed copy.
+    /// Whether the copy is launchable from the desktop environment's menu: the Start Menu shortcut on
+    /// Windows, the <c>.desktop</c> entry on Linux.
     /// </summary>
-    /// <remarks>
-    /// This used to return early when <see cref="IsRegistered"/> was true, and that is exactly why a
-    /// lost entry stayed lost: the check runs once at startup, the installed copy is launched
-    /// immediately after a *successful* registration, so it saw the entry present and skipped — and
-    /// nothing looks again for the rest of the process's life (BACKLOG, 2026-07-30). Re-asserting
-    /// costs one <c>reg import</c> on Windows, and <see cref="RegisterUnix"/> skips the work whose
-    /// result is already correct, so the price of self-healing is small enough to pay every launch.
-    /// </remarks>
-    /// <param name="trigger">
-    /// What prompted this launch. The app passes <c>update</c> when it has just been replaced in
-    /// place, because that is the launch on which registration has been observed to go missing, and a
-    /// log that doesn't distinguish it from an ordinary start would not have caught it.
-    /// </param>
-    public static void EnsureRegistered(string trigger = "startup")
-    {
-        if (Mode != InstallMode.Installed)
-        {
-            RecordAttempt(trigger, false, $"skipped: mode is {Mode}, not Installed");
-            return;
-        }
-        Register(ExePath, trigger);
-    }
-
-    /// <summary>
-    /// Whether the desktop environment already knows about this copy — an installed-apps entry on
-    /// Windows, a <c>.desktop</c> file on Linux.
-    /// </summary>
-    public static bool IsRegistered() => OperatingSystem.IsWindows()
-        ? Run(RegExe, ["query", UninstallKey, "/v", "DisplayName"]) == 0
-        : File.Exists(DesktopFilePath);
+    public static bool IsRegistered() =>
+        File.Exists(OperatingSystem.IsWindows() ? StartMenuShortcut : DesktopFilePath);
 
     /// <summary>
     /// Remove the registrations, then hand off to a detached helper that deletes the install
@@ -696,7 +508,6 @@ public static class InstallService
 
         if (OperatingSystem.IsWindows())
         {
-            Run(RegExe, ["delete", UninstallKey, "/f"]);
             TryDelete(StartMenuShortcut);
             return;
         }
@@ -740,19 +551,6 @@ public static class InstallService
             UseShellExecute = true,
         });
 
-    private static int FileSizeKb(string path)
-    {
-        try { return (int)(new FileInfo(path).Length / 1024); }
-        catch (IOException) { return 0; }
-        catch (UnauthorizedAccessException) { return 0; }
-    }
-
-    /// <summary>
-    /// Absolute path to reg.exe. Resolving it by bare name defers to the process's PATH, which is
-    /// one more thing that can differ between the contexts this runs in for no good reason.
-    /// </summary>
-    private static string RegExe => Path.Combine(Environment.SystemDirectory, "reg.exe");
-
     /// <summary>Run a console tool with no window and return its exit code (-1 if it wouldn't start).</summary>
     private static int Run(string fileName, IEnumerable<string> arguments) =>
         RunCaptured(fileName, arguments).Code;
@@ -789,22 +587,6 @@ public static class InstallService
             return (p.ExitCode, (stdout + " " + stderr).Trim());
         }
         catch (System.ComponentModel.Win32Exception) { return (-1, ""); }
-    }
-
-    /// <summary>
-    /// The <c>DisplayVersion</c> actually recorded in the installed-apps entry, or null if the key or
-    /// the value isn't there. Read back rather than assumed: an import that reports success and
-    /// changes nothing is indistinguishable from one that worked unless the result is checked.
-    /// </summary>
-    private static string? RegisteredVersion()
-    {
-        if (!OperatingSystem.IsWindows()) return null;
-        var (code, output) = RunCaptured(RegExe, ["query", UninstallKey, "/v", "DisplayVersion"]);
-        if (code != 0) return null;
-        // reg query prints: "    DisplayVersion    REG_SZ    1.0.0-beta1". Neither the value name nor
-        // the type is localised, so matching on them is safe on any Windows UI language.
-        var m = Regex.Match(output, @"DisplayVersion\s+REG_SZ\s+(?<v>\S.*?)\s*$", RegexOptions.Multiline);
-        return m.Success ? m.Groups["v"].Value.Trim() : null;
     }
 
     /// <summary>

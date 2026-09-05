@@ -29,12 +29,7 @@ public static class UpdateApplyScript
         // Copy-Item is non-terminating; $? reflects whether it actually succeeded.
         $"if ($?) {{ Remove-Item -LiteralPath '{failedMarker}' -ErrorAction SilentlyContinue }}\n" +
         $"else {{ New-Item -ItemType File -Path '{failedMarker}' -Force | Out-Null }}\n" +
-        // --updated tells the relaunched app which launch this is, so it can log its registration
-        // attempt under the trigger that matters. Note the flag only reaches the app one release
-        // after this script changes: the *outgoing* build writes the helper that starts the incoming
-        // one, so the first update after this ships still relaunches without it.
-        $"Start-Process -FilePath '{targetExe}' -WorkingDirectory '{workingDirectory}' " +
-        $"-ArgumentList '--updated'\n" +
+        $"Start-Process -FilePath '{targetExe}' -WorkingDirectory '{workingDirectory}'\n" +
         $"Remove-Item -LiteralPath '{stageRoot}' -Recurse -Force -ErrorAction SilentlyContinue\n" +
         $"Remove-Item -LiteralPath '{scriptPath}' -Force -ErrorAction SilentlyContinue\n";
 
@@ -51,7 +46,7 @@ public static class UpdateApplyScript
         $"  : > '{failedMarker}'\n" +
         "fi\n" +
         // cd first, for the same reason -WorkingDirectory is set on Windows.
-        $"(cd '{workingDirectory}' && '{targetExe}' --updated &)\n" +
+        $"(cd '{workingDirectory}' && '{targetExe}' &)\n" +
         $"rm -rf '{stageRoot}'\n" +
         $"rm -f '{scriptPath}'\n";
 }

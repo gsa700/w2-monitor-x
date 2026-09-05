@@ -49,20 +49,11 @@ public partial class App : Application
                 SelectedTabIndex = _config.SetupTab,   // the setter clamps a stale or hand-edited value
             };
 
-            // A copy installed by hand before there was an installer is adopted where it stands, so
-            // it appears in Installed apps without being copied to a second location.
-            //
-            // The updater's helper appends --updated when it relaunches, so the attempt is logged
-            // under the trigger that matters: registration has been observed to go missing on exactly
-            // that launch and on no other, and a log that couldn't tell it from an ordinary start
-            // would not have caught it (BACKLOG, 2026-07-31). EnsureRegistered records its own
-            // outcome now, including the skip and throw paths, so this catch is a backstop rather
-            // than the only thing standing between a failure and silence.
-            var updated = Environment.GetCommandLineArgs()
-                .Any(a => a.Equals("--updated", StringComparison.OrdinalIgnoreCase));
+            // A copy installed by hand before there was an installer is adopted where it stands, and
+            // its shortcuts are re-asserted every start. There is no installed-apps entry to maintain
+            // any more — see InstallService's class remarks for why.
             if (!simulated)
-                try { InstallService.EnsureRegistered(updated ? "update" : "startup"); }
-                catch { /* never block startup over this */ }
+                try { InstallService.EnsureRegistered(); } catch { /* never block startup over this */ }
 
             if (simulated) BuildSimMeters();
             else RestoreMeters();
@@ -296,9 +287,12 @@ public partial class App : Application
             $"Install {InstallService.DisplayName} on this computer?",
             affirmative: "Install",
             negative: "Not now",
-            detail: $"Copies the program to {InstallService.InstallDirectory} and lists it in "
-                  + "Settings → Apps → Installed apps, with a Start Menu shortcut. Your meters and "
-                  + "settings are untouched either way.\n\n"
+            detail: $"Copies the program to {InstallService.InstallDirectory} and adds "
+                  + (OperatingSystem.IsWindows()
+                      ? "Start Menu and desktop shortcuts. It will not appear in Settings → Apps; to "
+                        + "remove it later, use Setup → Updates → Remove."
+                      : "it to your applications menu, with a desktop launcher and a w2-monitor command.")
+                  + " Your meters and settings are untouched either way.\n\n"
                   + "To run from here permanently without being asked again, put a file named "
                   + $"{InstallLayout.PortableMarker} beside the program.");
 
@@ -308,17 +302,17 @@ public partial class App : Application
         {
             var installed = InstallService.Install();
 
-            // Installed but not listed is a real outcome, not a detail: the program works, yet the
-            // usual way to remove it is missing. Say so here rather than report a clean install and
-            // leave it to be discovered later in Settings.
+            // Installed but with no menu entry is worth saying: the program works, but the way most
+            // people expect to find it again is missing.
             if (!installed.Registered)
             {
                 await NotifyAsync(
-                    "Installed, but not listed",
+                    "Installed, but no shortcut",
                     $"{InstallService.DisplayName} was installed to {InstallService.InstallDirectory}, "
-                    + "but could not be added to Settings → Apps → Installed apps.",
-                    "The program itself works normally — only the usual way to uninstall it is "
-                    + "missing. Installing again often clears it.");
+                    + (OperatingSystem.IsWindows()
+                        ? "but a Start Menu shortcut could not be created."
+                        : "but its applications-menu entry could not be written."),
+                    "The program itself works normally, and you can remove it from Setup → Updates at any time.");
             }
 
             InstallService.LaunchDetached(installed.ExePath);
@@ -338,10 +332,12 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// The interactive <c>--uninstall</c> path, reached from the installed-apps entry. Asks what to
-    /// do about the settings, hands the deletion to a detached helper, and exits.
+    /// The interactive uninstall, reached from <c>--uninstall</c> or from Setup → Updates → Remove.
+    /// Asks what to do about the settings, hands the deletion to a detached helper, and exits. Internal
+    /// so Setup can run it: on Windows this is the only way to remove the app, since there is no
+    /// installed-apps entry (see <see cref="InstallService"/>).
     /// </summary>
-    private async Task RunUninstallAsync()
+    internal async Task RunUninstallAsync()
     {
         var confirmed = await ConfirmAsync(
             $"Remove {InstallService.DisplayName}",

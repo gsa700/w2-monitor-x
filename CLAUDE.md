@@ -14,7 +14,7 @@ dotnet build                                   # needs the .NET 10 SDK (pinned i
 dotnet run --project src/W2.App                # run the app (needs a desktop/DISPLAY)
 dotnet run --project src/W2.App -- --sim       # no hardware: drive UI from synthetic W2s
 dotnet run --project src/W2.App -- --setup     # open Setup on launch (debug)
-dotnet test                                    # xUnit suite — all pure W2.Core logic (168 tests)
+dotnet test                                    # xUnit suite — all pure W2.Core logic (258 tests)
 ```
 
 Runtime switches the app itself understands: `--sim`, `--setup`, and the install pair `--install` /
@@ -107,7 +107,8 @@ Each W2 is followed by its USB chip serial: FTDI serial pinning on **Windows** (
   help, and clearing PCA's records does nothing. The untested lever is an Authenticode signature. Full
   account and the ruled-out list in `BACKLOG.md` — **read it before re-investigating anything
   registry-shaped, and do not trust a registration result observed from a developer shell**, which is
-  the one launch context that is never affected.
+  the one launch context that is never affected. *Resolved by removing the registry entry entirely
+  (unreleased): Windows integration is shortcuts only, and removal is from Setup → Updates.*
 - Cross-platform validated on real hardware: **Windows, Pi CM5 (linux-arm64), Fedora (linux-x64)**.
 - A Pi-side Claude session has worked this repo too (`HANDOFF-PI.md`); the two boxes sync via git
   (`main`, two-way pull/push). Keep `main` clean and rebased-friendly.
@@ -153,28 +154,27 @@ name for the full rationale. No Inno/WiX/MSI and no new toolchain: the app insta
 - **Settings are named, not swept.** `DataFilesToRemove` lists `config.json` and its `.bak`; the data
   directory itself is never removed, so anything a later version puts there survives an older
   uninstall. The prompt defaults to keeping them — they hold the meter list and each cable's chip
-  serial. A quiet uninstall (what the installed-apps entry's own button runs) always keeps them,
-  because Windows gives the user no way to answer a dialog it didn't expect.
-- **Registry goes through `reg.exe`, deliberately** — the registry APIs need `net10.0-windows`, and the
-  plain `net10.0` TFM is what lets one target cross-publish Linux and Pi.
-- **Registration is one `reg import`, re-asserted every launch.** `RegFile` (Core, pure, tested) builds
-  a `.reg` file and `WriteUninstallEntry` imports it in a single spawn, instead of one `reg add` per
-  value. Two reasons, both learned the hard way: eleven spawns are eleven things that can individually
-  fail to happen with no way to tell a spawn that silently didn't take from one that did, and one
-  invocation is cheap enough to repeat on startup. `EnsureRegistered` therefore **rewrites rather than
-  checking and skipping** — the old early-out is exactly why a lost entry stayed lost, since the check
-  runs once at startup and the installed copy is launched right after a *successful* registration, so
-  it saw the entry present and skipped forever after. `RegisterUnix` likewise runs every launch and
-  skips only the steps whose result is already correct, so `update-desktop-database` isn't spawned
-  unless the entry's contents actually changed.
+  serial. A quiet uninstall (`--uninstall --quiet`) always keeps them, because an unattended run has
+  nobody to ask.
+- **No Windows registry entry, deliberately.** The app does not register in Settings → Apps and is
+  removed from its own Setup → Updates → Remove instead. It used to write an Uninstall key; from any
+  shell launch the write went into a compatibility-layer overlay and never reached the registry, while
+  the app's own read-back said it had (the Hardware & workflow note below, and BACKLOG, have the full
+  story). Windows integration is shortcuts only — Start Menu and desktop — which are files and were
+  never affected. `EnsureRegistered` still runs every launch to re-assert them, and `RegisterUnix`
+  runs every launch too, skipping the steps whose result is already correct so
+  `update-desktop-database` isn't spawned unless the entry's contents changed. **Do not reintroduce
+  registry writes without an Authenticode signature and a test from an Explorer launch** — a result
+  observed from a developer shell proves nothing, since that is the one launch context PCA never
+  touches.
 - **The Linux icon is the 256px frame lifted verbatim from `app.ico`**, embedded as a plain
   `EmbeddedResource` because `--install` runs before Avalonia is initialised, so the asset loader
   isn't available. Regenerate it from `app.ico` rather than editing the two separately.
 
-> **Linux is unverified on hardware**, exactly as in LP-100A. It compiles, cross-publishes, and its
-> pure logic is unit-tested, but no part of the filesystem work — icon write, `.desktop` entry,
-> symlink, `chmod`, the `sh` uninstall trampoline — has run on a real Linux box. The CM5 is the place
-> to settle it. Windows is verified end to end, both uninstall paths included.
+> **Linux is verified on the CM5** (2026-08-02, under v0.9.0-beta): the `.desktop` entry, the hicolor
+> icon, the `~/.local/bin` symlink, the desktop launcher with its executable bit, and adoption of the
+> legacy launcher all ran on real hardware. The `sh` uninstall trampoline is the one path not yet
+> exercised there. Windows is verified end to end, both uninstall paths included.
 
 ## Release workflow
 

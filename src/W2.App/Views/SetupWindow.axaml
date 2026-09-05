@@ -263,13 +263,6 @@
                      Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
           <Button Content="Elecraft website" Command="{Binding OpenElecraftCommand}" HorizontalAlignment="Left"/>
 
-          <!-- Whether this copy is listed in the OS's installed-apps list. Shown for an installed
-               copy only, and worth showing even when it's fine: the fault it exists to catch is one
-               where nothing appears to be wrong. -->
-          <TextBlock Text="{Binding RegistrationStatus}" Foreground="{Binding RegistrationStatusBrush}"
-                     IsVisible="{Binding ShowRegistrationStatus}"
-                     FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
-
           <!-- Only appears when a previous run actually crashed, so it is silent on a healthy machine.
                Here rather than on the main window because it reports something already over: it needs
                to be findable, not to interrupt. -->
@@ -277,6 +270,17 @@
             <TextBlock Text="{Binding CrashNotice}" Foreground="{StaticResource AmberBrush}"
                        FontSize="11" TextWrapping="Wrap"/>
             <Button Content="Show crash log" Command="{Binding ShowCrashLogCommand}" HorizontalAlignment="Left"/>
+          </StackPanel>
+
+          <!-- Removal lives in the app because on Windows there is nowhere else for it: the app used
+               to register an installed-apps entry, and from a shell launch the write never reached the
+               registry (see InstallService). Shown for an installed copy only — a loose or portable
+               one just runs where it sits. -->
+          <StackPanel IsVisible="{Binding CanUninstall}" Spacing="6" Margin="0,8,0,0">
+            <TextBlock Text="REMOVE" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}"/>
+            <TextBlock Text="Removes the program from this computer. You'll be asked whether to keep your settings."
+                       Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
+            <Button Content="Remove W2 Monitor…" Command="{Binding UninstallCommand}" HorizontalAlignment="Left"/>
           </StackPanel>
 
         </StackPanel>

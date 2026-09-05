@@ -47,17 +47,7 @@ public class UpdateApplyScriptTests
         Assert.Contains($"if cp -f '{Staged}' '{Target}'; then", s);
         Assert.Contains("chmod +x", s);
         Assert.Contains(Marker, s);   // failure branch records the marker
-        Assert.Contains($"'{Target}' --updated &", s);
-    }
-
-    [Fact]
-    public void Both_platforms_tell_the_relaunched_app_it_was_updated()
-    {
-        // The relaunched app logs its registration attempt under this trigger. Registration has been
-        // seen to go missing on the updater's relaunch and on no other launch, so a log that couldn't
-        // tell the two apart would not catch it — which is what makes the flag worth pinning.
-        Assert.Contains("--updated", Win());
-        Assert.Contains("--updated", Nix());
+        Assert.Contains($"'{Target}' &", s);
     }
 
     [Fact]

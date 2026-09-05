@@ -53,6 +53,7 @@ public sealed class SetupViewModel : ViewModelBase
         OpenReleaseCommand = new RelayCommand(OpenRelease);
         ShowCrashLogCommand = new RelayCommand(ShowCrashLog);
         OpenElecraftCommand = new RelayCommand(OpenElecraft);
+        UninstallCommand = new RelayCommand(() => _ = UninstallAsync(), () => CanUninstall);
         UpdateStatus = $"You have {UpdateService.CurrentVersion}.";
 
         RefreshPorts();
@@ -113,6 +114,7 @@ public sealed class SetupViewModel : ViewModelBase
     public RelayCommand OpenReleaseCommand { get; }
     public RelayCommand ShowCrashLogCommand { get; }
     public RelayCommand OpenElecraftCommand { get; }
+    public RelayCommand UninstallCommand { get; }
 
     // W2 control lamp state (reflects the selected meter).
     public bool CanControl => SelectedRow?.Meter is { IsConnected: true };
@@ -308,15 +310,8 @@ public sealed class SetupViewModel : ViewModelBase
     /// Read once when Setup opens rather than bound live: the interesting attempt happened during
     /// startup, long before anyone opened this tab, so there is nothing to keep up with.
     /// </remarks>
-    public bool ShowRegistrationStatus => InstallService.Mode == InstallMode.Installed;
-
-    public string RegistrationStatus =>
-        RegistrationLog.Describe(InstallService.LastAttempt, UpdateService.CurrentVersion);
-
-    public IBrush RegistrationStatusBrush =>
-        InstallService.LastAttempt is { Succeeded: false } ? Palette.RedBrush
-        : InstallService.LastAttempt is { } a && a.Version != UpdateService.CurrentVersion ? Palette.AmberBrush
-        : Palette.DimBrush;
+    /// <summary>Only an installed copy has anything to remove; a loose or portable one just runs where it sits.</summary>
+    public bool CanUninstall => InstallService.Mode == InstallMode.Installed;
 
     /// <summary>
     /// Firmware of each connected meter, one line each. Read from the meter once when the link comes
@@ -436,6 +431,16 @@ public sealed class SetupViewModel : ViewModelBase
     {
         try { Process.Start(new ProcessStartInfo("https://www.elecraft.com") { UseShellExecute = true }); }
         catch { /* ignore */ }
+    }
+
+    /// <summary>
+    /// Hand off to the app's uninstall flow — the same one <c>--uninstall</c> runs — so removal never
+    /// depends on anything outside the program. On Windows there is no installed-apps entry to do it
+    /// from; see <see cref="InstallService"/> for why.
+    /// </summary>
+    private static async Task UninstallAsync()
+    {
+        if (Application.Current is App app) await app.RunUninstallAsync();
     }
 
     /// <summary>
