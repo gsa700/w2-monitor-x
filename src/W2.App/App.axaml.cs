@@ -28,6 +28,7 @@ public partial class App : Application
     // Set while we close meter windows ourselves (mode switch, meter removal, update exit) so the
     // user-close cascade in NotifyMainWindowClosing doesn't fire — those closes must not quit the app.
     private bool _programmaticClose;
+    private bool _uninstalling;   // set once Uninstall() has run: the exit handler must then guarantee the process ends
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
@@ -68,7 +69,17 @@ public partial class App : Application
 
             _display.PropertyChanged += OnDisplayChanged;
             _manager.MetersChanged += OnMetersChanged;
-            desktop.Exit += (_, _) => { SaveConfig(); _manager.Dispose(); };
+            desktop.Exit += (_, _) =>
+            {
+                SaveConfig();
+                _manager.Dispose();
+                // An uninstall run must end, whatever the UI framework does next: the helper deletes
+                // the install folder only once this process is gone, so a process that closes its
+                // windows and then lingers leaves the program half-removed with nothing on screen to
+                // say so. Give the normal shutdown a moment, then leave regardless — everything worth
+                // saving is already done above. (Ported from LP-100A, 2026-09-04.)
+                if (_uninstalling) _ = Task.Delay(3000).ContinueWith(_ => Environment.Exit(0));
+            };
 
             // A previous in-app update whose file swap failed left a marker and relaunched the old exe.
             var updateFailed = !simulated && UpdateService.ConsumeUpdateFailed();
@@ -261,6 +272,23 @@ public partial class App : Application
         foreach (var w in AllWindows().ToList()) w.Close();
     }
 
+    /// <summary>
+    /// Close every window — and with it the app — from a later dispatcher frame, never from inside
+    /// the input event still being delivered.
+    /// </summary>
+    /// <remarks>
+    /// Every caller runs as the continuation of a <see cref="ConfirmAsync"/> answer, which is to say
+    /// inside the mouse-release that clicked the dialog's button. Closing the dialog, its owner and
+    /// the owned Setup window from in there left a windowless process that never exited: the
+    /// shutdown was requested from inside pointer delivery to a window tree being torn down, and the
+    /// message loop never came back. Found in LP-100A on 2026-09-04 with real mouse clicks — UI
+    /// Automation's Invoke, which raises Click without any pointer event, never reproduced it, and
+    /// that one difference is what cornered it. Background priority runs after all pending input has
+    /// been processed, which is the whole point.
+    /// </remarks>
+    private void CloseAllWindowsWhenIdle() =>
+        Avalonia.Threading.Dispatcher.UIThread.Post(CloseAllWindows, Avalonia.Threading.DispatcherPriority.Background);
+
     /// <summary>Modal confirmation, owned by whatever window is available.</summary>
     /// <param name="negative">Null for a one-button message that only reports an outcome.</param>
     public Task<bool> ConfirmAsync(string title, string message,
@@ -316,7 +344,7 @@ public partial class App : Application
             }
 
             InstallService.LaunchDetached(installed.ExePath);
-            CloseAllWindows();
+            CloseAllWindowsWhenIdle();
             return true;
         }
         catch (InstallBlockedException ex)
@@ -346,7 +374,7 @@ public partial class App : Application
             negative: "Cancel",
             detail: $"Deletes the program from {InstallService.InstallDirectory}.");
 
-        if (!confirmed) { CloseAllWindows(); return; }
+        if (!confirmed) { CloseAllWindowsWhenIdle(); return; }
 
         // Asked separately, and declining is the safe button: the settings hold the meter list and
         // each cable's chip-serial pinning, which is fiddly enough to redo that it shouldn't go
@@ -360,10 +388,11 @@ public partial class App : Application
                   + $"in {ConfigStore.DataDir}. Keeping them means a later install picks up where "
                   + "you left off.");
 
+        _uninstalling = true;
         try { InstallService.Uninstall(new UninstallOptions(removeSettings)); }
         catch (Exception ex) { await NotifyAsync("Could not uninstall", ex.Message); }
 
-        CloseAllWindows();
+        CloseAllWindowsWhenIdle();
     }
 
     private IEnumerable<Window> AllWindows()

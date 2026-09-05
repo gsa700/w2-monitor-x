@@ -424,7 +424,7 @@ public static class InstallService
         // Installed copy's directory is private to the app (canonical or an adopted legacy folder),
         // so that one can go whole; a shared directory such as ~/.local/bin never can, which is why
         // Unregister removes its items one file at a time.
-        // (Divergence from LP-100A, which deletes ExeDirectory unconditionally — worth porting back.)
+        // (LP-100A had deleted ExeDirectory unconditionally; it took this guard in v0.9.19-beta.)
         if (Mode == InstallMode.Installed) toDelete.Add(ExeDirectory);
 
         toDelete.AddRange(DataFilesToRemove(options));
@@ -438,8 +438,17 @@ public static class InstallService
             {
                 $"while (Get-Process -Id {pid} -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 300 }}",
             };
+            // Retried for up to ten seconds rather than attempted once. The wait loop above sees the
+            // process id vanish a moment before the executable's mapping is released, and a single
+            // Remove-Item in that gap fails on the locked exe — silently, because the helper has no
+            // window and no one to tell. (Ported from LP-100A, 2026-09-04.)
             lines.AddRange(toDelete.Select(p =>
-                $"Remove-Item -LiteralPath '{p.Replace("'", "''")}' -Recurse -Force -ErrorAction SilentlyContinue"));
+            {
+                var q = p.Replace("'", "''");
+                return $"for ($i = 0; $i -lt 40 -and (Test-Path -LiteralPath '{q}'); $i++) {{ " +
+                       $"Remove-Item -LiteralPath '{q}' -Recurse -Force -ErrorAction SilentlyContinue; " +
+                       $"if (Test-Path -LiteralPath '{q}') {{ Start-Sleep -Milliseconds 250 }} }}";
+            }));
             // Take the helper with it, so an uninstall doesn't leave its own tooling behind in temp.
             lines.Add($"Remove-Item -LiteralPath '{script.Replace("'", "''")}' -Force -ErrorAction SilentlyContinue");
 
@@ -450,6 +459,12 @@ public static class InstallService
                 Arguments = $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{script}\"",
                 UseShellExecute = false,
                 CreateNoWindow = true,
+                // The helper must not inherit this process's working directory: an installed copy
+                // runs with its own folder as the working directory, and Windows will not remove a
+                // directory that is any live process's current directory — including the one doing
+                // the removing. Without this the helper deletes the files and then fails on the
+                // folder itself, every time, from inside it. (Ported from LP-100A, 2026-09-04.)
+                WorkingDirectory = Path.GetTempPath(),
             });
         }
         else
@@ -470,6 +485,10 @@ public static class InstallService
                 FileName = "/bin/sh",
                 ArgumentList = { script },
                 UseShellExecute = false,
+                // Same reason as the Windows branch. Linux will unlink a directory that is a process's
+                // cwd, but the helper then sits in a deleted directory, and nothing about that is
+                // worth keeping.
+                WorkingDirectory = Path.GetTempPath(),
             });
         }
     }

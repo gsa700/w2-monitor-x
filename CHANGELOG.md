@@ -5,6 +5,21 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+### Fixed
+- **Remove from Setup now actually exits, and the helper can now delete the install folder.** Three
+  defects shared with LP-100A Monitor, found there on 2026-09-04 and ported here. (1) Answering the
+  Remove dialog with a real mouse click left the app running with no windows: the close ran inside the
+  mouse-release that pressed the button, tearing down the dialog, its owner and the Setup window
+  mid-delivery, and the message loop never came back. Every window close that follows a dialog answer
+  is now posted for a later frame, and an uninstall run arms a three-second exit backstop besides. (2)
+  The uninstall helper inherited the app's working directory — the install folder — and Windows will
+  not remove a directory any process is standing in, including the one doing the removing: files
+  gone, empty folder left, every time. The helper now starts from the temp directory on both
+  platforms. (3) Its single-shot delete could land between the process id vanishing and the
+  executable's mapping being released; it now retries for up to ten seconds. The 1.0.0-beta3 round
+  trip on this station could not have shown any of these — a lingering windowless process looks like
+  a clean exit, and the reinstall recreated the folder before anyone looked.
+
 ## [1.0.0-beta3] - 2026-09-04
 
 The build for the tester round. One design change, made after finding why a Windows install kept

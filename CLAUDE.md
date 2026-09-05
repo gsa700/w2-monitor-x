@@ -176,12 +176,27 @@ name for the full rationale. No Inno/WiX/MSI and no new toolchain: the app insta
   `EmbeddedResource` because `--install` runs before Avalonia is initialised, so the asset loader
   isn't available. Regenerate it from `app.ico` rather than editing the two separately.
 
+- **Three rules the uninstall path learned on 2026-09-04, each from a real failure in LP-100A and
+  each shared here.** (1) *Never close the app from inside a dialog's click.* Every `ConfirmAsync`
+  answer is a continuation running inside the mouse-release that pressed the button; closing the
+  windows there tore down the dialog, its owner and the owned Setup window mid-delivery and left a
+  windowless process that never exited. `CloseAllWindowsWhenIdle` posts the close at Background
+  priority instead. Reproduced only with real pointer input — UIA `Invoke`, which raises Click
+  without a pointer event, never hung, and that was the discriminator. **Test this with a real mouse,
+  not automation.** (2) *The uninstall helper gets its own working directory* (`Path.GetTempPath()`):
+  it inherited the install folder, and a process cannot remove the directory it stands in. (3) *The
+  helper retries the delete for ten seconds*; a one-shot delete can land before the exe mapping is
+  released. An uninstalling process also arms `Environment.Exit(0)` three seconds after cleanup, since
+  the helper is waiting on that PID and nothing in the process is worth preserving by then.
+
 > **Linux is verified on the CM5** (2026-08-02, under v0.9.0-beta): the `.desktop` entry, the hicolor
 > icon, the `~/.local/bin` symlink, the desktop launcher with its executable bit, and adoption of the
 > legacy launcher all ran on real hardware. The `sh` uninstall trampoline is the one path not yet
 > exercised there. Windows is verified end to end: `--uninstall` interactive and quiet, and the
 > Setup → Updates → Remove button — the latter round-tripped on a real install on 2026-09-04, with
-> settings kept and both shortcuts recreated on reinstall.
+> settings kept and both shortcuts recreated on reinstall. *That round trip proved the dialogs and the
+> reinstall; it could not have shown the three defects below — a lingering windowless process looks
+> like a clean exit, and the reinstall recreated the folder before anyone looked.*
 
 ## Release workflow
 
