@@ -97,12 +97,12 @@ Dogfooding feedback and small improvements, batched into releases.
   ordinary pure state-machine logic over a reading stream and would port cleanly. A peak-targeting
   bug has already shipped once (v0.4.1-beta's Reset Peak fix). (`MeterService` → `W2.Core`.)
 
-- **RESOLVED by removal (unreleased): Windows' Program Compatibility Assistant virtualises this app's
+- **RESOLVED by removal in v1.0.0-beta3: Windows' Program Compatibility Assistant virtualises this app's
   registry writes whenever it is launched through the shell** *(proven 2026-09-04)*. Read this before
   touching anything registry-related. It explains every registration anomaly since July, and both
   obvious in-app workarounds have already been tested and shown not to work.
 
-  *Resolution.* The installed-apps entry and everything that wrote it were removed the same day, on
+  *Resolution (shipped in v1.0.0-beta3).* The installed-apps entry and everything that wrote it were removed the same day, on
   David's call: install to the same per-user folder, keep the Start Menu and desktop shortcuts (files,
   never affected), and remove from inside the app — a **Remove W2 Monitor…** button on Setup → Updates
   runs the same flow as `--uninstall`. That closes the only real harm, which was a tester with no way

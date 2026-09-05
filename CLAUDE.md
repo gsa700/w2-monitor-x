@@ -108,7 +108,7 @@ Each W2 is followed by its USB chip serial: FTDI serial pinning on **Windows** (
   account and the ruled-out list in `BACKLOG.md` — **read it before re-investigating anything
   registry-shaped, and do not trust a registration result observed from a developer shell**, which is
   the one launch context that is never affected. *Resolved by removing the registry entry entirely
-  (unreleased): Windows integration is shortcuts only, and removal is from Setup → Updates.*
+  in v1.0.0-beta3: Windows integration is shortcuts only, and removal is from Setup → Updates.*
 - Cross-platform validated on real hardware: **Windows, Pi CM5 (linux-arm64), Fedora (linux-x64)**.
 - A Pi-side Claude session has worked this repo too (`HANDOFF-PI.md`); the two boxes sync via git
   (`main`, two-way pull/push). Keep `main` clean and rebased-friendly.
