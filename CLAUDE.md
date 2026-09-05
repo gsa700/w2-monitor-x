@@ -7,6 +7,11 @@ Runs on Windows, Linux, and Raspberry Pi (arm64). GPLv3. By David Erickson (AB0R
 This is the cross-platform successor to the retired PowerShell `w2-monitor`. It is the
 sole, ongoing W2 Monitor line — all W2 work happens here.
 
+**In public beta since 2026-09-04**, announced on the Elecraft mailing list at v1.0.0-beta3. Releases
+now land on strangers' stations through the in-app updater the moment they are marked Latest, so
+cut them with that in mind, and expect tester reports to arrive as GitHub issues or list replies —
+`crash.log` and the firmware version shown in Setup are what to ask them for.
+
 ## Build / run / test
 
 ```sh
