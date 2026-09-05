@@ -5,6 +5,11 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+## [1.0.0-beta4] - 2026-09-04
+
+Same day as beta3, because beta3's **Remove W2 Monitor…** button was broken in a way its own test
+couldn't show. Fix only; nothing else changed.
+
 ### Fixed
 - **Remove from Setup now actually exits, and the helper can now delete the install folder.** Three
   defects shared with LP-100A Monitor, found there on 2026-09-04 and ported here. (1) Answering the
