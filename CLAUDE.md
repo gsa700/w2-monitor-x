@@ -174,7 +174,9 @@ name for the full rationale. No Inno/WiX/MSI and no new toolchain: the app insta
 > **Linux is verified on the CM5** (2026-08-02, under v0.9.0-beta): the `.desktop` entry, the hicolor
 > icon, the `~/.local/bin` symlink, the desktop launcher with its executable bit, and adoption of the
 > legacy launcher all ran on real hardware. The `sh` uninstall trampoline is the one path not yet
-> exercised there. Windows is verified end to end, both uninstall paths included.
+> exercised there. Windows is verified end to end: `--uninstall` interactive and quiet, and the
+> Setup → Updates → Remove button — the latter round-tripped on a real install on 2026-09-04, with
+> settings kept and both shortcuts recreated on reinstall.
 
 ## Release workflow
 
