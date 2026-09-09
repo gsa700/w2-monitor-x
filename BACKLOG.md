@@ -89,6 +89,17 @@ Dogfooding feedback and small improvements, batched into releases.
   the Pi, and "Wayland session" is confirmed as the wrong thing to test for: the same Avalonia build
   under two Wayland compositors will behave differently depending on whose XWayland it lands in.
 
+  **Confirmed by click, 2026-09-09.** On Fedora 44 / GNOME, with per-meter windows on, both W2 windows
+  stayed on top while a text editor was opened and dragged across them. So the checkbox works on
+  Windows and on GNOME's Wayland session, and fails only on the Pi's labwc — the discriminator is the
+  compositor's XWayland window manager, not the session type. That changes the recommended fix:
+  **don't hide the control anywhere.** Hiding it on "Wayland" would take a working feature away from
+  every GNOME user to spare labwc users a checkbox that does nothing; and there is no honest runtime
+  test, because an X11 client can set `_NET_WM_STATE_ABOVE` but cannot read back whether the WM
+  honoured it. Leave it visible with a short note beside it — *"may not take effect on some Linux
+  desktops"* — which is true, cheap, and wrong nowhere. If that's the fix, this item closes on one
+  line of XAML. (`SetupWindow.axaml`, Display tab.)
+
 - **"PEAK FORWARD" doesn't say it is a session high-water mark** *(dogfooding, 2026-07-31)* — it binds
   `SessionPeakW`, a maximum since app start that only ever rises and is cleared solely by Reset Peak.
   So a single high over latches the number, and every later lower-power transmission leaves it
