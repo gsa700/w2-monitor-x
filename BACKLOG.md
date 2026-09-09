@@ -4,6 +4,13 @@ Dogfooding feedback and small improvements, batched into releases.
 
 ## Open
 
+- **Memory baseline on Linux, for comparison only** *(2026-09-09)* — no evidence of a problem; this
+  exists so the next look has a number. On Fedora 44 (linux-x64, v1.0.0-beta4), two W2s connected and
+  polling, the process read **224 MB RSS after 1 d 20 h** of continuous running. Avalonia + Skia
+  self-contained idles around 150–200 MB, so this is plausible as steady state, but a single sample
+  cannot tell steady from climbing. If a later reading on a similar uptime is materially higher, that
+  is the signal; if it's the same, close this. (`ps -o rss -p $(pgrep -x W2Monitor)`.)
+
 - **Decide whether to tell users their W2 firmware is behind** *(deferred 2026-09-04, when the readout
   was added)* — Setup now reports the meter's version but never judges it. Whether that is enough turns
   on a question the beta round is about to answer.
@@ -73,6 +80,14 @@ Dogfooding feedback and small improvements, batched into releases.
   the backend before hiding a control on the strength of `$WAYLAND_DISPLAY`. Once known: hide the
   option where it cannot work, or leave it visible and annotated. (`App.axaml.cs` sets `Topmost` in
   `CreateFocusWindow` / `CreateMeterWindow`.)
+
+  *New data point, Fedora 44 / GNOME / Wayland, 2026-09-09:* the app runs there as an **X11 client
+  under XWayland**, not native Wayland — the journal carries Avalonia's `[X11Platform] SMLib/ICELib …
+  SESSION_MANAGER environment variable not defined`, which only an X11 backend emits. So on GNOME the
+  request goes to Mutter's XWayland window manager as `_NET_WM_STATE_ABOVE`, which Mutter *does*
+  honour for X11 clients. Untested by click, but it means the checkbox may work on Fedora and not on
+  the Pi, and "Wayland session" is confirmed as the wrong thing to test for: the same Avalonia build
+  under two Wayland compositors will behave differently depending on whose XWayland it lands in.
 
 - **"PEAK FORWARD" doesn't say it is a session high-water mark** *(dogfooding, 2026-07-31)* — it binds
   `SessionPeakW`, a maximum since app start that only ever rises and is cleared solely by Reset Peak.

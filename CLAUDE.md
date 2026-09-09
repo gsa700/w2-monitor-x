@@ -194,7 +194,14 @@ name for the full rationale. No Inno/WiX/MSI and no new toolchain: the app insta
 > legacy launcher all ran on real hardware. The `sh` uninstall trampoline is the one path not yet
 > exercised there. Windows is verified end to end: `--uninstall` interactive and quiet, and the
 > Setup → Updates → Remove button — the latter round-tripped on a real install on 2026-09-04, with
-> settings kept and both shortcuts recreated on reinstall. *That round trip proved the dialogs and the
+> settings kept and both shortcuts recreated on reinstall.
+> **Linux is now verified on two distros with different desktops:** the Pi CM5 (labwc) and Fedora 44
+> (GNOME, Wayland session) — install offer, menu entry, icon, symlink, desktop shortcut and `by-id`
+> cable pinning all correct on both, two days' continuous running on Fedora with no crash log. One
+> GNOME-specific thing that is not a bug: stock GNOME shows no desktop icons, so the desktop shortcut
+> exists there (exec bit set) but is invisible without the desktop-icons extension; the menu entry is
+> the launcher that matters. Under GNOME the app runs as an X11 client via XWayland, not native
+> Wayland — see the Always-on-top item in BACKLOG for why that matters. *That round trip proved the dialogs and the
 > reinstall; it could not have shown the three defects below — a lingering windowless process looks
 > like a clean exit, and the reinstall recreated the folder before anyone looked.*
 
