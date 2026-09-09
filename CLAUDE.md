@@ -85,10 +85,12 @@ Each W2 is followed by its USB chip serial: FTDI serial pinning on **Windows** (
 
 ## Hardware & workflow notes
 
-- **Both W2s are attached to this Windows box** (verified 2026-07-19) — live hardware testing
-  works here. `--sim` is still the way to work without touching the rig. On-air dogfooding of
-  releases happens at the station. *(An earlier version of this note said this box had no W2
-  attached and that both lived on HAMSTATION — no longer true here.)*
+- **The two W2s and the LP-100A move between boxes — check before assuming.** As of 2026-09-09 all
+  three are on the Fedora box (`TestbedLinux`, 10.0.1.193, user `derickson`, reachable by key from
+  here), where they have been since 2026-09-07. Before that they were on this Windows box (2026-07-19
+  onward) and on the CM5 for its shakedown. Verify with `/dev/serial/by-id/` on Linux or the COM
+  port list here rather than trusting this line, which has been wrong twice. `--sim` is still the way
+  to work without touching the rig; on-air dogfooding happens wherever the meters are.
 - **Identify every USB adapter by its chip serial, never by COM port.** Ports renumber; all of
   them changed across a clean Windows 11 reinstall on 2026-07-19. Every FT232R here reports
   stock EEPROM (`USB Serial Converter`, no programmed product name), so nothing in Windows
@@ -104,6 +106,11 @@ Each W2 is followed by its USB chip serial: FTDI serial pinning on **Windows** (
 
   **Never run Detect to work out which adapter is which** — it sends `V` and may key a radio,
   and two of these are transmitters. Read the table, or ask.
+
+  On Linux the same chips appear in `/dev/serial/by-id/` with the serial **truncated to 8
+  characters** — `usb-FTDI_FT232R_USB_UART_A10KMB4V-if00-port0`, not `A10KMB4VA` — so the table
+  above doesn't match verbatim there. It's the same device; the app pins by the whole `by-id` name on
+  Linux, so nothing depends on the length, but a person matching by eye should drop the last letter.
 - **Windows registry writes from a shell launch are virtualised by the Program Compatibility
   Assistant** and never reach the real registry — reg.exe and in-process alike, children included. The
   app cannot tell from inside; its own read-back sees the overlay. This is why the installed-apps entry
