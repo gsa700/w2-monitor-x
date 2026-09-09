@@ -208,7 +208,11 @@ name for the full rationale. No Inno/WiX/MSI and no new toolchain: the app insta
 > GNOME-specific thing that is not a bug: stock GNOME shows no desktop icons, so the desktop shortcut
 > exists there (exec bit set) but is invisible without the desktop-icons extension; the menu entry is
 > the launcher that matters. Under GNOME the app runs as an X11 client via XWayland, not native
-> Wayland — see the Always-on-top item in BACKLOG for why that matters. *That round trip proved the dialogs and the
+> Wayland — see the Always-on-top item in BACKLOG for why that matters.
+> Rendering on Fedora is smooth and, by David's eye, indistinguishable from Windows — the first real
+> answer to the Linux render/scale question HANDOFF-PI left open. Always-on-top works there for all
+> three station apps (W2, LP-100A, Shack Power), which share the same Avalonia-under-XWayland path;
+> each project should carry that in its own docs. *That round trip proved the dialogs and the
 > reinstall; it could not have shown the three defects below — a lingering windowless process looks
 > like a clean exit, and the reinstall recreated the folder before anyone looked.*
 
