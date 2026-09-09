@@ -90,7 +90,9 @@ Dogfooding feedback and small improvements, batched into releases.
   under two Wayland compositors will behave differently depending on whose XWayland it lands in.
 
   **Confirmed by click, 2026-09-09.** On Fedora 44 / GNOME, with per-meter windows on, both W2 windows
-  stayed on top while a text editor was opened and dragged across them. So the checkbox works on
+  stayed on top while a text editor was opened and dragged across them, and unticking it returned
+  them to normal stacking — the hint is honoured in both directions, so there is no sticky state to
+  guard against. The same held for LP-100A and Shack Power on that box. So the checkbox works on
   Windows and on GNOME's Wayland session, and fails only on the Pi's labwc — the discriminator is the
   compositor's XWayland window manager, not the session type. That changes the recommended fix:
   **don't hide the control anywhere.** Hiding it on "Wayland" would take a working feature away from
