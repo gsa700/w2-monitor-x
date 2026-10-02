@@ -115,8 +115,20 @@ public static class CrashReport
         return reports;
     }
 
-    /// <summary>Timestamp of the newest report, or null if the file holds none that parse.</summary>
-    public static DateTime? LastCrashUtc(string? contents)
+    /// <summary>
+    /// Whether a report with this source ended the process. Only <c>unhandled</c> does: an
+    /// unobserved task exception is recorded for its diagnostic value, but .NET does not terminate
+    /// on one and the handler marks it observed, so the app carried on. Telling a user a crash was
+    /// recorded for that is how the Sep 7 unplug of a meter turned into a request for a bug report.
+    /// </summary>
+    public static bool IsFatal(string? source) => string.Equals(source, "unhandled", StringComparison.Ordinal);
+
+    /// <summary>
+    /// Timestamp of the newest report, or null if the file holds none that parse. With
+    /// <paramref name="fatalOnly"/>, only reports that actually ended the process count, which is
+    /// the question the Setup notice is asking.
+    /// </summary>
+    public static DateTime? LastCrashUtc(string? contents, bool fatalOnly = false)
     {
         DateTime? newest = null;
         foreach (var report in Split(contents))
@@ -124,6 +136,7 @@ public static class CrashReport
             var header = report.Split('\n')[0];
             var fields = header[HeaderPrefix.Length..].Split("  ", StringSplitOptions.RemoveEmptyEntries);
             if (fields.Length == 0) continue;
+            if (fatalOnly && !IsFatal(fields.Length > 3 ? fields[3].TrimEnd('=', ' ') : null)) continue;
             if (DateTime.TryParse(fields[0], CultureInfo.InvariantCulture,
                     DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var when)
                 && (newest is null || when > newest)) newest = when;

@@ -29,6 +29,15 @@ public sealed class MeterService : IDisposable
     public string Name { get; set; }
     public string? Port { get; set; }
     public string? Serial { get; set; }   // FTDI/USB chip serial, so the cable is followed across renumbering
+
+    /// <summary>
+    /// The port the reader most recently <em>opened</em> this run, and the identity of the adapter
+    /// that was on it at that moment, captured when the open succeeds rather than looked up later.
+    /// Null until a connection has actually been made. These, not <see cref="Port"/> and the live
+    /// port map, are what may refresh the saved pin: see <see cref="W2.Core.PortPin.ForSave"/>.
+    /// </summary>
+    public string? OpenedPort { get; private set; }
+    public string? OpenedSerial { get; private set; }
     public bool IsSimulated { get; }
 
     public W2Reading? Current { get; private set; }
@@ -108,6 +117,15 @@ public sealed class MeterService : IDisposable
             TrackStatus(r);
             ReadingReceived?.Invoke(this);
         });
+
+        // Resolve the adapter identity on the reader thread, while the device is certainly the one
+        // just opened. Looking it up at save time instead is how a meter unplugged mid-session can
+        // have its identity overwritten by whatever device inherited its port name since.
+        _reader.Opened += port =>
+        {
+            var serial = IsSimulated ? null : PortIdentity.SerialFor(port);
+            Dispatcher.UIThread.Post(() => { OpenedPort = port; OpenedSerial = serial; });
+        };
 
         _reader.StatusChanged += (msg, isError) => Dispatcher.UIThread.Post(() =>
         {

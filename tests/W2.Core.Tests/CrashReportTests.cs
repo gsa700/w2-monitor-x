@@ -5,8 +5,35 @@ namespace W2.Core.Tests;
 
 public class CrashReportTests
 {
-    private static CrashRecord Rec(string detail, int day = 1, string version = "0.8.0-beta") =>
-        new(new DateTime(2026, 8, day, 12, 0, 0, DateTimeKind.Utc), version, "win-x64", "unhandled", detail);
+    private static CrashRecord Rec(string detail, int day = 1, string version = "0.8.0-beta", string source = "unhandled") =>
+        new(new DateTime(2026, 8, day, 12, 0, 0, DateTimeKind.Utc), version, "win-x64", source, detail);
+
+    [Fact]
+    public void ANewerTaskRecordDoesNotCountAsTheLastCrash()
+    {
+        // The Sep 7 case: a port-close task exception logged after a real crash. The notice must
+        // point at the crash, not at the thing the process survived.
+        var file = CrashReport.Format(Rec("real crash", day: 1)) +
+                   CrashReport.Format(Rec("event loop on a closed handle", day: 3, source: "task"));
+        Assert.Equal(new DateTime(2026, 8, 3, 12, 0, 0, DateTimeKind.Utc), CrashReport.LastCrashUtc(file));
+        Assert.Equal(new DateTime(2026, 8, 1, 12, 0, 0, DateTimeKind.Utc), CrashReport.LastCrashUtc(file, fatalOnly: true));
+    }
+
+    [Fact]
+    public void OnlyTaskRecordsMeansNoCrashToReport()
+    {
+        var file = CrashReport.Format(Rec("unobserved", day: 2, source: "task"));
+        Assert.NotNull(CrashReport.LastCrashUtc(file));
+        Assert.Null(CrashReport.LastCrashUtc(file, fatalOnly: true));
+    }
+
+    [Theory]
+    [InlineData("unhandled", true)]
+    [InlineData("task", false)]
+    [InlineData("dispatcher", false)]
+    [InlineData(null, false)]
+    public void OnlyUnhandledIsFatal(string? source, bool fatal) =>
+        Assert.Equal(fatal, CrashReport.IsFatal(source));
 
     [Fact]
     public void HeaderCarriesTheMetadataAReportHasToBeMatchedBy()

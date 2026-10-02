@@ -5,6 +5,36 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+### Fixed
+- **Removing the app now also removes its extraction cache.** The .NET single-file host unpacks the
+  native libraries into a per-build folder — `~/.net/W2Monitor/` on Linux, `%TEMP%\.net\W2Monitor\`
+  on Windows — and never cleans up, so every version ever launched left roughly 17 MB behind, and on
+  Linux nothing on the system ever reclaims it. Remove now deletes that whole subtree, done by the
+  helper after the app exits since the running copy holds its own folder open. Ported from LP-100A.
+- **Closing with a meter unplugged can no longer overwrite its identity with another device.** On the
+  way out the app refreshed each meter's saved serial from whatever adapter was on its port at that
+  moment. Unplug a W2, let another USB serial device inherit its `ttyUSB` name — on the Fedora box,
+  the Victron cable — and close, and the meter was re-pinned to the shunt. The identity is now
+  captured when the port is actually opened, and only a connection this run made can refresh it; the
+  live port map is never consulted at save time. A meter never connected this run keeps whatever was
+  saved. (`PortPin` in Core, 8 tests.) LP-100A fixed the same class of fault in 1.0.1 and 1.0.2;
+  this also closes a gap its rule still has, since that one looks the serial up at save time.
+- **On Linux, a port held by another program no longer reads as a permissions problem.**
+  `System.IO.Ports` reports both with the same exception; the message led with `dialout` and sent an
+  operator already in the group off to `usermod`. It now names in-use first and the group second.
+- **Setup no longer announces a crash for something that was not one.** Closing a port on Windows can
+  leave the `System.IO.Ports` event-loop task touching the released handle a moment later; the app
+  records that for diagnosis, but .NET does not terminate on it and the app carries on. The Updates
+  tab counted it as a crash and asked for a bug report — every Windows tester who unplugged a meter
+  got that. The notice now fires only for a crash that actually ended the process; task records stay
+  in `crash.log`, marked in the body as not a crash.
+
+### Changed
+- **"Always on top" gains a one-line note** that it may not take effect on some Linux desktops. It
+  works on Windows and GNOME and fails only under compositors whose X11 window manager ignores the
+  hint — which the app cannot detect, so the control stays visible everywhere rather than being
+  hidden on "Wayland" and taken away from every GNOME user.
+
 ## [1.0.0-beta4] - 2026-09-04
 
 Same day as beta3, because beta3's **Remove W2 Monitor…** button was broken in a way its own test

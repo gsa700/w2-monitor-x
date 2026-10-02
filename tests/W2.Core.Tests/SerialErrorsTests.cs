@@ -64,4 +64,14 @@ public class SerialErrorsTests
         var msg = SerialErrors.Describe(new InvalidOperationException("boom"), "COM8", isLinux: false);
         Assert.Contains("boom", msg);
     }
+
+    [Fact]
+    public void Linux_access_error_names_in_use_before_dialout()
+    {
+        // System.IO.Ports raises the same exception for a port another program holds, and for anyone
+        // already in dialout that is the common case, so it is named first.
+        var msg = SerialErrors.Describe(new UnauthorizedAccessException(), "/dev/ttyUSB0", isLinux: true);
+        Assert.Contains("in use", msg);
+        Assert.True(msg.IndexOf("in use", StringComparison.Ordinal) < msg.IndexOf("dialout", StringComparison.Ordinal));
+    }
 }

@@ -11,6 +11,12 @@ public interface IReadingSource : IDisposable
     event Action<W2Reading>? ReadingReceived;
     event Action<string, bool>? StatusChanged;   // (message, isError)
 
+    /// <summary>
+    /// A port was actually opened, with its name — a connection, not an attempt. Fires again on
+    /// every reconnect. What may refresh a saved pin keys off this, never off a Start call.
+    /// </summary>
+    event Action<string>? Opened;
+
     bool IsRunning { get; }
 
     /// <summary>

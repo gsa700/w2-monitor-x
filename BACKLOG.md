@@ -4,7 +4,9 @@ Dogfooding feedback and small improvements, batched into releases.
 
 ## Open
 
-- **beta5 — the last beta before 1.0** *(planned 2026-09-25, started 10-02)*. beta4 already clears the
+- **beta5 — the last beta before 1.0** *(planned 2026-09-25, started 10-02)*.
+  *Status 2026-10-02:* all five implemented, build clean, 273 tests. Items 1, 3, 4 and 5 are in Done
+  below. What remains is the cut, the Fedora update through the in-app updater, and the soak. beta4 already clears the
   bar LP-100A set for its 1.0 (see *The soak before 1.0* in CLAUDE.md). beta5 exists to carry the four
   things LP-100A learned *after* its 1.0, which W2 shares, plus one finding of its own, so 1.0.0 is not
   a knowing 1.0.1. Then: cut it; **update Fedora beta4 → beta5 through the in-app updater** (the one
@@ -30,19 +32,6 @@ Dogfooding feedback and small improvements, batched into releases.
   4. **The crash notice fires for a non-crash** — see the next item.
   5. **Always-on-top note** — one line of XAML on the Display tab, decided 2026-09-09, never applied.
 
-- **The crash notice fires for a non-crash** *(found 2026-09-25 in the Windows `crash.log`, confirmed
-  from David's own shell)* — one record, Sep 7, source `task`:
-  `System.IO.Ports.SerialStream.EventLoopRunner.WaitForCommEvent` → `ObjectDisposedException` on a
-  `SafeFileHandle`. That is the library's event-loop task outliving a port the app closed — the
-  meter unplug for the move to Fedora — and a known Windows quirk of `System.IO.Ports`. **It did not
-  crash:** .NET 10 does not terminate on an unobserved task exception, and the handler calls
-  `SetObserved`. But `CrashReport.LastCrashUtc` counts every header regardless of source, so
-  Setup → Updates told whoever looked "A crash was recorded — attach crash.log to a bug report."
-  Every Windows tester who unplugs a meter gets the same. Fix: the notice only for source
-  `unhandled`; keep logging `task` records — they have diagnostic value — labeled non-fatal in the
-  header and excluded from the notice. Pure, so it goes in `CrashReport` with a test.
-  (`CrashReport`, `CrashLog`, `SetupViewModel`.)
-
 - **Decide whether to tell users their W2 firmware is behind** *(deferred 2026-09-04, when the readout
   was added)* — Setup now reports the meter's version but never judges it. Whether that is enough turns
   on a question the beta round is about to answer.
@@ -64,75 +53,6 @@ Dogfooding feedback and small improvements, batched into releases.
   *Wait for the sample.* Two meters from one station, both on the same version, is the worst possible
   basis for this. Testers' meters are the data — if they come back spread across 1.04 to 1.07, build
   it; if everyone is on 1.07, there is nothing to report. (`W2FrameParser.Firmware`, `SetupViewModel`.)
-
-- **Uninstall leaves the single-file extraction directory behind** *(found on the CM5, 2026-08-02)* —
-  a self-contained single-file build unpacks its native libraries to `$HOME/.net/<AppName>/<hash>/` on
-  Linux (`%TEMP%\.net\…` on Windows), and `Uninstall` knows nothing about it. The hash changes with
-  every build, so these accumulate one per distinct binary ever launched and are never reclaimed. On
-  this box: **176 MB**, across 7 `W2Monitor` directories and 10 `Lp100aMonitor` ones at 9.6–13 MB
-  each, the oldest dated 2026-07-04.
-
-  *Windows is bigger but self-limiting; Linux is smaller and permanent.* Measured on the Windows box
-  2026-08-02: **515 MB** in `%TEMP%\.net\`, of which `W2Monitor` is 209 MB over 12 directories and
-  `Lp100aMonitor` 263 MB over 15 — all since 2026-07-27, six days. The asymmetry is the part that
-  matters for prioritising: on Windows these sit in `%TEMP%`, which Storage Sense and Disk Cleanup can
-  reclaim, so the ceiling is bounded by whatever the OS eventually sweeps. On Linux they sit in
-  `$HOME/.net/`, which is not temporary and which nothing on the system ever cleans — so the Pi's
-  smaller 176 MB only ever grows. **Fix the Linux side first if the two are ever separated.**
-
-  Both counts are inflated by development — a release cycle publishes and smoke-tests several distinct
-  binaries in a day. A user updating through the in-app updater accrues one directory per version, at
-  roughly 17 MB, which is the number to reason about for the tester round.
-
-  Not a correctness problem — the app runs fine and the directories are inert — but "uninstall the
-  program" leaving ~80 MB per app behind isn't what it says on the tin, and **LP-100A is affected
-  identically** since the installer pattern is shared. Two things to get right if it's implemented:
-  the path is chosen by the .NET host rather than by us, so removing `$HOME/.net/<AppName>` wholesale
-  is the honest scope; and a *running* copy has one of those directories open, which is why it belongs
-  in the uninstall trampoline beside the install directory rather than in `Unregister`.
-  (`InstallService`.)
-
-- **"Always on top" does nothing on Wayland (Pi / labwc)** *(found 2026-07-31)* — the Display
-  checkbox sets `Window.Topmost`, which wlroots-based compositors don't honour: there is no Wayland
-  protocol for a client to ask to be always-on-top, and labwc ignores the request. Verified on the
-  CM5 rather than assumed — a focus window positioned deliberately underneath another application,
-  with `AlwaysOnTop: true` in config and the window confirmed mapped via its taskbar entry, still
-  drew behind it. A user can tick the box and nothing happens, with nothing saying why.
-
-  *Confirmed working on Windows 11 Pro (v0.7.0-beta, 2026-07-31)*, so this is genuinely
-  platform-specific and not a regression in the setting itself — which means the fix is about saying
-  so, not about repairing `Topmost`.
-
-  What to settle before implementing: **which condition to test for.** "Wayland" is the wrong
-  question — no Wayland compositor offers a client-requestable always-on-top, but an X11 client gets
-  `_NET_WM_STATE_ABOVE`, and this app may be running as an X11 client under XWayland rather than as a
-  native Wayland one (`.xsession-errors` on the CM5 is full of `xwayland/xwm.c` traffic). So the
-  honest test is probably "did the request take effect", not "what is the session type" — and
-  labwc's own xwm may or may not honour the hint. Worth checking what Avalonia actually reports for
-  the backend before hiding a control on the strength of `$WAYLAND_DISPLAY`. Once known: hide the
-  option where it cannot work, or leave it visible and annotated. (`App.axaml.cs` sets `Topmost` in
-  `CreateFocusWindow` / `CreateMeterWindow`.)
-
-  *New data point, Fedora 44 / GNOME / Wayland, 2026-09-09:* the app runs there as an **X11 client
-  under XWayland**, not native Wayland — the journal carries Avalonia's `[X11Platform] SMLib/ICELib …
-  SESSION_MANAGER environment variable not defined`, which only an X11 backend emits. So on GNOME the
-  request goes to Mutter's XWayland window manager as `_NET_WM_STATE_ABOVE`, which Mutter *does*
-  honour for X11 clients. Untested by click, but it means the checkbox may work on Fedora and not on
-  the Pi, and "Wayland session" is confirmed as the wrong thing to test for: the same Avalonia build
-  under two Wayland compositors will behave differently depending on whose XWayland it lands in.
-
-  **Confirmed by click, 2026-09-09.** On Fedora 44 / GNOME, with per-meter windows on, both W2 windows
-  stayed on top while a text editor was opened and dragged across them, and unticking it returned
-  them to normal stacking — the hint is honoured in both directions, so there is no sticky state to
-  guard against. The same held for LP-100A and Shack Power on that box. So the checkbox works on
-  Windows and on GNOME's Wayland session, and fails only on the Pi's labwc — the discriminator is the
-  compositor's XWayland window manager, not the session type. That changes the recommended fix:
-  **don't hide the control anywhere.** Hiding it on "Wayland" would take a working feature away from
-  every GNOME user to spare labwc users a checkbox that does nothing; and there is no honest runtime
-  test, because an X11 client can set `_NET_WM_STATE_ABOVE` but cannot read back whether the WM
-  honoured it. Leave it visible with a short note beside it — *"may not take effect on some Linux
-  desktops"* — which is true, cheap, and wrong nowhere. If that's the fix, this item closes on one
-  line of XAML. (`SetupWindow.axaml`, Display tab.)
 
 - **"PEAK FORWARD" doesn't say it is a session high-water mark** *(dogfooding, 2026-07-31)* — it binds
   `SessionPeakW`, a maximum since app start that only ever rises and is cleared solely by Reset Peak.
@@ -367,6 +287,91 @@ entry, and the CM5 shakedown of the installer's Linux paths (`HANDOFF-PI.md` car
 for that one).
 
 ## Done
+
+- **The crash notice fires for a non-crash** *(found 2026-09-25 in the Windows `crash.log`, confirmed
+  *Fixed in beta5 (unreleased, 2026-10-02):* the notice now fires only for a report whose source is `unhandled`; task records are still written, with a first body line saying the process continued. `CrashReport.IsFatal` + `LastCrashUtc(fatalOnly)` in Core, 3 tests.
+  from David's own shell)* — one record, Sep 7, source `task`:
+  `System.IO.Ports.SerialStream.EventLoopRunner.WaitForCommEvent` → `ObjectDisposedException` on a
+  `SafeFileHandle`. That is the library's event-loop task outliving a port the app closed — the
+  meter unplug for the move to Fedora — and a known Windows quirk of `System.IO.Ports`. **It did not
+  crash:** .NET 10 does not terminate on an unobserved task exception, and the handler calls
+  `SetObserved`. But `CrashReport.LastCrashUtc` counts every header regardless of source, so
+  Setup → Updates told whoever looked "A crash was recorded — attach crash.log to a bug report."
+  Every Windows tester who unplugs a meter gets the same. Fix: the notice only for source
+  `unhandled`; keep logging `task` records — they have diagnostic value — labeled non-fatal in the
+  header and excluded from the notice. Pure, so it goes in `CrashReport` with a test.
+  (`CrashReport`, `CrashLog`, `SetupViewModel`.)
+
+- **Uninstall leaves the single-file extraction directory behind** *(found on the CM5, 2026-08-02)* —
+  *Fixed in beta5 (unreleased, 2026-10-02):* `ExtractionRoot` added to the uninstall helper's delete list, both platforms, honoring `DOTNET_BUNDLE_EXTRACT_BASE_DIR`. Port of LP-100A `bfd1625`. Proof on Fedora comes with the beta5 update (two dirs) and the eventual uninstall (none).
+  a self-contained single-file build unpacks its native libraries to `$HOME/.net/<AppName>/<hash>/` on
+  Linux (`%TEMP%\.net\…` on Windows), and `Uninstall` knows nothing about it. The hash changes with
+  every build, so these accumulate one per distinct binary ever launched and are never reclaimed. On
+  this box: **176 MB**, across 7 `W2Monitor` directories and 10 `Lp100aMonitor` ones at 9.6–13 MB
+  each, the oldest dated 2026-07-04.
+
+  *Windows is bigger but self-limiting; Linux is smaller and permanent.* Measured on the Windows box
+  2026-08-02: **515 MB** in `%TEMP%\.net\`, of which `W2Monitor` is 209 MB over 12 directories and
+  `Lp100aMonitor` 263 MB over 15 — all since 2026-07-27, six days. The asymmetry is the part that
+  matters for prioritising: on Windows these sit in `%TEMP%`, which Storage Sense and Disk Cleanup can
+  reclaim, so the ceiling is bounded by whatever the OS eventually sweeps. On Linux they sit in
+  `$HOME/.net/`, which is not temporary and which nothing on the system ever cleans — so the Pi's
+  smaller 176 MB only ever grows. **Fix the Linux side first if the two are ever separated.**
+
+  Both counts are inflated by development — a release cycle publishes and smoke-tests several distinct
+  binaries in a day. A user updating through the in-app updater accrues one directory per version, at
+  roughly 17 MB, which is the number to reason about for the tester round.
+
+  Not a correctness problem — the app runs fine and the directories are inert — but "uninstall the
+  program" leaving ~80 MB per app behind isn't what it says on the tin, and **LP-100A is affected
+  identically** since the installer pattern is shared. Two things to get right if it's implemented:
+  the path is chosen by the .NET host rather than by us, so removing `$HOME/.net/<AppName>` wholesale
+  is the honest scope; and a *running* copy has one of those directories open, which is why it belongs
+  in the uninstall trampoline beside the install directory rather than in `Unregister`.
+  (`InstallService`.)
+
+- **"Always on top" does nothing on Wayland (Pi / labwc)** *(found 2026-07-31)* — the Display
+  *Done in beta5 (unreleased, 2026-10-02):* the checkbox stays visible everywhere and carries a one-line note, exactly as settled on 2026-09-09. Nothing else to do here.
+  checkbox sets `Window.Topmost`, which wlroots-based compositors don't honour: there is no Wayland
+  protocol for a client to ask to be always-on-top, and labwc ignores the request. Verified on the
+  CM5 rather than assumed — a focus window positioned deliberately underneath another application,
+  with `AlwaysOnTop: true` in config and the window confirmed mapped via its taskbar entry, still
+  drew behind it. A user can tick the box and nothing happens, with nothing saying why.
+
+  *Confirmed working on Windows 11 Pro (v0.7.0-beta, 2026-07-31)*, so this is genuinely
+  platform-specific and not a regression in the setting itself — which means the fix is about saying
+  so, not about repairing `Topmost`.
+
+  What to settle before implementing: **which condition to test for.** "Wayland" is the wrong
+  question — no Wayland compositor offers a client-requestable always-on-top, but an X11 client gets
+  `_NET_WM_STATE_ABOVE`, and this app may be running as an X11 client under XWayland rather than as a
+  native Wayland one (`.xsession-errors` on the CM5 is full of `xwayland/xwm.c` traffic). So the
+  honest test is probably "did the request take effect", not "what is the session type" — and
+  labwc's own xwm may or may not honour the hint. Worth checking what Avalonia actually reports for
+  the backend before hiding a control on the strength of `$WAYLAND_DISPLAY`. Once known: hide the
+  option where it cannot work, or leave it visible and annotated. (`App.axaml.cs` sets `Topmost` in
+  `CreateFocusWindow` / `CreateMeterWindow`.)
+
+  *New data point, Fedora 44 / GNOME / Wayland, 2026-09-09:* the app runs there as an **X11 client
+  under XWayland**, not native Wayland — the journal carries Avalonia's `[X11Platform] SMLib/ICELib …
+  SESSION_MANAGER environment variable not defined`, which only an X11 backend emits. So on GNOME the
+  request goes to Mutter's XWayland window manager as `_NET_WM_STATE_ABOVE`, which Mutter *does*
+  honour for X11 clients. Untested by click, but it means the checkbox may work on Fedora and not on
+  the Pi, and "Wayland session" is confirmed as the wrong thing to test for: the same Avalonia build
+  under two Wayland compositors will behave differently depending on whose XWayland it lands in.
+
+  **Confirmed by click, 2026-09-09.** On Fedora 44 / GNOME, with per-meter windows on, both W2 windows
+  stayed on top while a text editor was opened and dragged across them, and unticking it returned
+  them to normal stacking — the hint is honoured in both directions, so there is no sticky state to
+  guard against. The same held for LP-100A and Shack Power on that box. So the checkbox works on
+  Windows and on GNOME's Wayland session, and fails only on the Pi's labwc — the discriminator is the
+  compositor's XWayland window manager, not the session type. That changes the recommended fix:
+  **don't hide the control anywhere.** Hiding it on "Wayland" would take a working feature away from
+  every GNOME user to spare labwc users a checkbox that does nothing; and there is no honest runtime
+  test, because an X11 client can set `_NET_WM_STATE_ABOVE` but cannot read back whether the WM
+  honoured it. Leave it visible with a short note beside it — *"may not take effect on some Linux
+  desktops"* — which is true, cheap, and wrong nowhere. If that's the fix, this item closes on one
+  line of XAML. (`SetupWindow.axaml`, Display tab.)
 
 - **Memory baseline on Linux** (closed 2026-10-02) — three samples on v1.0.0-beta4, Fedora 44, two
   W2s polling: **224 MB** RSS at 45 h (Sep 9), **216 MB** at 7 d 3 h (Sep 25), **216 MB** at 6 d 19 h

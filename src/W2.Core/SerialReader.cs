@@ -54,6 +54,13 @@ public sealed class SerialReader : IReadingSource
     public event Action<W2Reading>? ReadingReceived;
     public event Action<string, bool>? StatusChanged;  // (message, isError)
 
+    /// <summary>
+    /// A port was actually opened, with its name. Unlike a <see cref="Start"/> call this is a
+    /// connection: it fires after the native open succeeds and the settle has passed, never for an
+    /// attempt that failed, and again on every reconnect the supervisor makes.
+    /// </summary>
+    public event Action<string>? Opened;
+
     public bool IsRunning => _running;
 
     public static string[] GetPortNames() => SerialPort.GetPortNames();
@@ -253,6 +260,7 @@ public sealed class SerialReader : IReadingSource
             try { port.DiscardInBuffer(); } catch { /* non-fatal */ }
             _everConnected = true;
             StatusChanged?.Invoke($"Connected on {portName}", false);
+            try { Opened?.Invoke(portName); } catch { /* not our problem */ }
             ProbeToggleStates();
 
             while (_running && !_linkFaulted && !health.IsLost)

@@ -173,6 +173,27 @@ public static class InstallService
     }
 
     /// <summary>How this copy is running. Derived from its path every time — never cached or stored.</summary>
+    /// <summary>
+    /// Where the .NET single-file host unpacks the native libraries: a per-build directory under
+    /// <c>$HOME/.net/W2Monitor/</c> on Linux and <c>%TEMP%\.net\W2Monitor\</c> on Windows, which
+    /// the host never removes. One accumulates per distinct binary ever launched (209 MB across 12
+    /// on the Windows box when measured, 2026-08-02; on Linux nothing ever sweeps them). Honors the
+    /// override variable the host itself reads, since that decides the location when it is set.
+    /// Ported from LP-100A (bfd1625).
+    /// </summary>
+    private static string ExtractionRoot
+    {
+        get
+        {
+            var root = Environment.GetEnvironmentVariable("DOTNET_BUNDLE_EXTRACT_BASE_DIR");
+            if (string.IsNullOrEmpty(root))
+                root = OperatingSystem.IsWindows()
+                    ? Path.Combine(Path.GetTempPath(), ".net")
+                    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".net");
+            return Path.Combine(root, "W2Monitor");
+        }
+    }
+
     public static InstallMode Mode => InstallLayout.Detect(
         ExeDirectory,
         File.Exists(Path.Combine(ExeDirectory, InstallLayout.PortableMarker)),
@@ -428,6 +449,11 @@ public static class InstallService
         if (Mode == InstallMode.Installed) toDelete.Add(ExeDirectory);
 
         toDelete.AddRange(DataFilesToRemove(options));
+
+        // The extraction path is chosen by the host, so the whole subtree is the honest scope, and
+        // the helper has to be what removes it: this running copy holds its own extraction directory
+        // open right now, which is also why the Windows helper retries.
+        toDelete.Add(ExtractionRoot);
 
         var pid = Environment.ProcessId;
 

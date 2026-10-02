@@ -32,6 +32,7 @@ public sealed class W2SimReader : IReadingSource
 
     public event Action<W2Reading>? ReadingReceived;
     public event Action<string, bool>? StatusChanged;
+    public event Action<string>? Opened;
 
     public bool IsRunning => _running;
 
@@ -39,6 +40,8 @@ public sealed class W2SimReader : IReadingSource
     {
         Stop();
         _running = true;
+        // A simulator has no port to open, so it is "open" the moment it starts.
+        Opened?.Invoke(portName);
         _thread = new Thread(Loop) { IsBackground = true, Name = "W2-SIM" };
         _thread.Start();
     }

@@ -199,6 +199,14 @@
             <CheckBox Grid.Row="2" Grid.Column="1" Content="Always on top" IsChecked="{Binding Display.AlwaysOnTop, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>
           </Grid>
 
+          <!-- Kept visible everywhere on purpose: it works on Windows and on GNOME (via XWayland) and
+               fails only where the X11 window manager of the compositor ignores the hint, which an
+               X11 client cannot detect, so there is no honest condition to hide it on. Hiding it on
+               Wayland would take a working feature away from every GNOME user. Settled across three
+               boxes, 2026-09-09; see the Always-on-top item in BACKLOG. -->
+          <TextBlock Text="Always on top may not take effect on some Linux desktops."
+                     Foreground="{StaticResource DimBrush}" FontSize="11" TextWrapping="Wrap"/>
+
           <TextBlock Text="TX TIMER" FontSize="12" FontWeight="Bold" Foreground="{StaticResource DimBrush}" Margin="0,4,0,0"/>
 
           <CheckBox Content="Show TX timer" IsChecked="{Binding Display.ShowTx, Mode=TwoWay}" Foreground="{StaticResource TextBrush}"/>

@@ -466,8 +466,10 @@ public partial class App : Application
         {
             var c = ConfigFor(m.Id);
             c.Name = m.Name;
-            c.Port = m.Port;
-            c.Serial = m.Port is not null && PortIdentity.SerialFor(m.Port) is { } s ? s : m.Serial;
+            // The port is always the current assignment, resolved by cable or picked in Setup. The
+            // serial is refreshed only from a connection this run actually made, and from what was on
+            // the port then, never from whatever sits on that name at close (PortPin, tested).
+            (c.Port, c.Serial) = PortPin.ForSave(m.OpenedPort, m.OpenedSerial, m.Port, m.Serial);
         }
     }
 }

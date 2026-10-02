@@ -59,7 +59,9 @@ public static class CrashLog
                 UpdateService.CurrentVersion,
                 UpdateService.Rid(),
                 source,
-                CrashReport.Describe(ex));
+                // Say in the body what the header cannot: a task record is not a crash.
+                (CrashReport.IsFatal(source) ? "" : "(not a crash: an unobserved task exception; the process continued)" + Environment.NewLine)
+                    + CrashReport.Describe(ex));
 
             File.AppendAllText(FilePath, CrashReport.Format(record));
         }
@@ -85,14 +87,15 @@ public static class CrashLog
     }
 
     /// <summary>
-    /// When the newest recorded crash happened, or null if there are none. Read at startup, before
+    /// When the newest recorded <em>fatal</em> crash happened, or null if there are none. Task
+    /// records are deliberately excluded: they are logged, but the process survived them. Read at startup, before
     /// this run can add to it, so it answers "did the last run end badly".
     /// </summary>
     public static DateTime? LastCrashUtc()
     {
         try
         {
-            return File.Exists(FilePath) ? CrashReport.LastCrashUtc(File.ReadAllText(FilePath)) : null;
+            return File.Exists(FilePath) ? CrashReport.LastCrashUtc(File.ReadAllText(FilePath), fatalOnly: true) : null;
         }
         catch (IOException) { return null; }
         catch (UnauthorizedAccessException) { return null; }
