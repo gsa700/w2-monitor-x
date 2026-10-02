@@ -4,12 +4,44 @@ Dogfooding feedback and small improvements, batched into releases.
 
 ## Open
 
-- **Memory baseline on Linux, for comparison only** *(2026-09-09)* — no evidence of a problem; this
-  exists so the next look has a number. On Fedora 44 (linux-x64, v1.0.0-beta4), two W2s connected and
-  polling, the process read **224 MB RSS after 1 d 20 h** of continuous running. Avalonia + Skia
-  self-contained idles around 150–200 MB, so this is plausible as steady state, but a single sample
-  cannot tell steady from climbing. If a later reading on a similar uptime is materially higher, that
-  is the signal; if it's the same, close this. (`ps -o rss -p $(pgrep -x W2Monitor)`.)
+- **beta5 — the last beta before 1.0** *(planned 2026-09-25, started 10-02)*. beta4 already clears the
+  bar LP-100A set for its 1.0 (see *The soak before 1.0* in CLAUDE.md). beta5 exists to carry the four
+  things LP-100A learned *after* its 1.0, which W2 shares, plus one finding of its own, so 1.0.0 is not
+  a knowing 1.0.1. Then: cut it; **update Fedora beta4 → beta5 through the in-app updater** (the one
+  Linux path with no record — it also exercises the `sh` `--updated` relaunch, and leaves two
+  extraction dirs for the later uninstall to prove the cleanup on); soak ~7 days; 1.0.0 = beta5 with
+  the suffix removed and nothing else changed, dependencies included.
+
+  1. **Extraction-dir cleanup** — port LP-100A `bfd1625`: an `ExtractionRoot` property (honors
+     `DOTNET_BUNDLE_EXTRACT_BASE_DIR`) and one `toDelete.Add`. W2's `Uninstall()` already has the
+     `toDelete` list, the `sh` `rm -rf`, and the Windows retry loop. Closes the item below.
+  2. **Save-pin rule — with a distinction.** LP-100A's 1.0.1 fixed two things and **W2 has one of
+     them.** W2's Setup list never guesses: `RefreshPorts` (`SetupViewModel.cs:259`) re-selects only a
+     port still present, no first-port fallback — so "closed with the meter unplugged, saved the
+     Victron as the meter" cannot happen here. But `SyncMeterConfig` (`App.axaml.cs:470`) refreshes
+     each meter's serial from whatever device is on its port at close. Unplug a W2, let another USB
+     serial take that `ttyUSB` name — the Victron cable is on that very box — close, and the meter's
+     identity is overwritten. That is LP-100A's 1.0.2 shape. Port `93cfd0d` + `0f5bc4d` minus
+     `Reselect`: an `Opened` event in `SerialReader` where it already reports "Connected on" (~line
+     255), `OpenedPort` on `MeterService`, and `PortPin.ForSave` in Core with its tests.
+  3. **Linux "in use" wording** — `SerialErrors` leads with `dialout`; `System.IO.Ports` raises the
+     same exception for a port another program holds, which is the common case for anyone already in
+     the group. Port `0f5bc4d`'s order: in-use first, group second. The existing test still passes.
+  4. **The crash notice fires for a non-crash** — see the next item.
+  5. **Always-on-top note** — one line of XAML on the Display tab, decided 2026-09-09, never applied.
+
+- **The crash notice fires for a non-crash** *(found 2026-09-25 in the Windows `crash.log`, confirmed
+  from David's own shell)* — one record, Sep 7, source `task`:
+  `System.IO.Ports.SerialStream.EventLoopRunner.WaitForCommEvent` → `ObjectDisposedException` on a
+  `SafeFileHandle`. That is the library's event-loop task outliving a port the app closed — the
+  meter unplug for the move to Fedora — and a known Windows quirk of `System.IO.Ports`. **It did not
+  crash:** .NET 10 does not terminate on an unobserved task exception, and the handler calls
+  `SetObserved`. But `CrashReport.LastCrashUtc` counts every header regardless of source, so
+  Setup → Updates told whoever looked "A crash was recorded — attach crash.log to a bug report."
+  Every Windows tester who unplugs a meter gets the same. Fix: the notice only for source
+  `unhandled`; keep logging `task` records — they have diagnostic value — labeled non-fatal in the
+  header and excluded from the notice. Pure, so it goes in `CrashReport` with a test.
+  (`CrashReport`, `CrashLog`, `SetupViewModel`.)
 
 - **Decide whether to tell users their W2 firmware is behind** *(deferred 2026-09-04, when the readout
   was added)* — Setup now reports the meter's version but never judges it. Whether that is enough turns
@@ -335,6 +367,11 @@ entry, and the CM5 shakedown of the installer's Linux paths (`HANDOFF-PI.md` car
 for that one).
 
 ## Done
+
+- **Memory baseline on Linux** (closed 2026-10-02) — three samples on v1.0.0-beta4, Fedora 44, two
+  W2s polling: **224 MB** RSS at 45 h (Sep 9), **216 MB** at 7 d 3 h (Sep 25), **216 MB** at 6 d 19 h
+  (Oct 2). Flat across two separate week-long processes. Steady state, not climbing; the item existed
+  so a second look would have a number, and the second and third looks say there is nothing here.
 
 - **The installer owns a desktop shortcut, on both platforms** (v0.8.0-beta) — `Register` wrote a menu
   entry, an icon and the Linux `~/.local/bin` symlink but nothing on the desktop, which on a Pi is how

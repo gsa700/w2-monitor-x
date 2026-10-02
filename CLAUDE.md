@@ -216,6 +216,22 @@ name for the full rationale. No Inno/WiX/MSI and no new toolchain: the app insta
 > reinstall; it could not have shown the three defects below — a lingering windowless process looks
 > like a clean exit, and the reinstall recreated the folder before anyone looked.*
 
+> **The soak before 1.0, 2026-09-04 → 10-02.** v1.0.0-beta4 has run on Fedora since the day it
+> shipped, as two back-to-back continuous processes with a reboot between: pid 8229 from Sep 18 15:27
+> until the Sep 25 23:35 reboot (7 d 8 h; measured alive at 7 d 3 h), then pid 5455 from within a
+> minute of that boot, 6 d 19 h and counting on Oct 2. Both W2s held throughout (`ttyUSB1`/`ttyUSB2`),
+> and each relaunch found both meters by `by-id` after the reboot renumbered the bus — the Sep 18
+> reboot is the same one that moved LP-100A from `ttyUSB6` to `ttyUSB3`. No `crash.log`; `coredumpctl`
+> has no W2Monitor entries at all. Memory is flat: 224 MB RSS at 45 h (Sep 9), 216 MB at 7 d 3 h
+> (Sep 25), 216 MB at 6 d 19 h (Oct 2). Windows: beta4 ran Sep 4–7 until the meters moved to Fedora;
+> the one `crash.log` record there (Sep 7, source `task`) is the `System.IO.Ports` event-loop task
+> touching a closed handle on the unplug — confirmed from David's own shell, not a crash, and the
+> reason it was reported as one is a defect in its own right (BACKLOG, false crash notice). A
+> Remove → reinstall round trip on Windows Sep 4. No issues filed in the four weeks since the Elecraft
+> list post; downloads across the 1.0 betas 9 / 8 / 7 (win-x64 / linux-x64 / linux-arm64).
+> **The one path with no Linux record is the in-app updater** — Fedora was installed from a loose copy
+> and beta4 is Latest, so nothing has ever updated it there. beta5 is the vehicle for that.
+
 ## Release workflow
 
 `gh` is installed and authed as `gsa700`. A release = git tag + three self-contained zips
