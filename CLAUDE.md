@@ -19,7 +19,7 @@ dotnet build                                   # needs the .NET 10 SDK (pinned i
 dotnet run --project src/W2.App                # run the app (needs a desktop/DISPLAY)
 dotnet run --project src/W2.App -- --sim       # no hardware: drive UI from synthetic W2s
 dotnet run --project src/W2.App -- --setup     # open Setup on launch (debug)
-dotnet test                                    # xUnit suite — all pure W2.Core logic (258 tests)
+dotnet test                                    # xUnit suite — all pure W2.Core logic (273 tests)
 ```
 
 Runtime switches the app itself understands: `--sim`, `--setup`, and the install pair `--install` /
@@ -238,7 +238,8 @@ name for the full rationale. No Inno/WiX/MSI and no new toolchain: the app insta
 (`W2Monitor-win-x64.zip`, `-linux-x64.zip`, `-linux-arm64.zip`) attached to a GitHub release
 (asset names must match what the updater expects). Version scheme mirrors the PS app:
 `<1.0` = `-beta` (in use, not broadly field-tested); publish as a full "Latest" release so the
-updater sees it. Update `CHANGELOG.md` for every release.
+updater sees it. **1.0.0 shipped 2026-10-02**; releases from here are plain `X.Y.Z`, and the
+pre-release-aware compare in `VersionOrder` is what made the beta → release step safe for the updater. Update `CHANGELOG.md` for every release.
 
 Two ordering traps, both spelled out in the step-by-step recipe in `HANDOFF-PI.md`: **commit the
 version bump before publishing** (binaries embed the commit sha, so publishing first stamps them with

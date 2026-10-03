@@ -5,6 +5,28 @@ app; this is the Windows/Linux/Raspberry-Pi rewrite.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-02
+
+The beta caveat — real and in use, but not yet broadly field-tested — stopped being true for the code
+that soaked, and the handful of changes since are small, unit-tested, and fail safe:
+
+- v1.0.0-beta4 ran on Fedora 44 for three weeks as two back-to-back week-long processes with a reboot
+  between (Sep 18 → 25, Sep 25 → Oct 2), both W2s connected throughout and found again by `by-id`
+  after each renumber. No crash, no coredump, memory flat at 216 MB.
+- Every install and removal path has run on real hardware on Windows, Fedora x64 and the Raspberry Pi
+  CM5 arm64; the in-app updater end to end on Windows.
+- Four weeks on the Elecraft list with no issues filed.
+- No known advisories against the dependency graph, transitive included.
+
+What is **not** soaked: the five changes below. They ship here rather than in a further beta because
+each fails safe — the pin rule can only decline to refresh a serial, the crash notice can only fire
+less, the cleanup touches nothing but the app's own cache folder — and four of them are LP-100A's,
+already proven there. The Linux in-app update is exercised by this very release going onto the Fedora
+box.
+
+Deliberately not changed: dependencies. Avalonia 12.1.1 and the .NET 10.0.10 packages are what
+soaked. Newer exist; they come next.
+
 ### Fixed
 - **Removing the app now also removes its extraction cache.** The .NET single-file host unpacks the
   native libraries into a per-build folder — `~/.net/W2Monitor/` on Linux, `%TEMP%\.net\W2Monitor\`

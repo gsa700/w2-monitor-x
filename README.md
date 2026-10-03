@@ -10,10 +10,9 @@ Raspberry Pi**. Built with .NET 10 + Avalonia.
 
 ![W2 Monitor main window](docs/main.png)
 
-> **Beta:** validated on real hardware across **Windows, Linux, and Raspberry Pi** (identical
-> behavior on each) — in active use, but not yet broadly field-tested across many stations. This
-> is the cross-platform successor to the original (now retired) PowerShell
-> [W2 Monitor](https://github.com/gsa700/w2-monitor).
+> Status: **1.0.0** — in daily use on Windows and Linux; install and removal verified on real
+> hardware on Windows, Linux and Raspberry Pi. This is the cross-platform successor to the original
+> (now retired) PowerShell [W2 Monitor](https://github.com/gsa700/w2-monitor).
 
 ## Features
 
